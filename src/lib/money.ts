@@ -43,3 +43,14 @@ export function amountInWords(paise: number): string {
   const ps = paise % 100;
   return `Rupees ${numberToWordsIN(rupees)}${ps ? ` and ${belowHundred(ps)} Paise` : ""} Only`;
 }
+
+/** Short Indian-style amount for dashboards: ₹950, ₹45.2K, ₹3.4L, ₹1.25Cr. */
+export function formatCompactINR(paise: number): string {
+  const rupees = paise / 100;
+  const abs = Math.abs(rupees);
+  const trim = (n: number, digits: number) => String(Number(n.toFixed(digits)));
+  if (abs >= 1_00_00_000) return `₹${trim(rupees / 1_00_00_000, 2)}Cr`;
+  if (abs >= 1_00_000) return `₹${trim(rupees / 1_00_000, 2)}L`;
+  if (abs >= 1000) return `₹${trim(rupees / 1000, 1)}K`;
+  return `₹${Math.round(rupees).toLocaleString("en-IN")}`;
+}

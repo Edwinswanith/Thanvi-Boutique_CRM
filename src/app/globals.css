@@ -174,12 +174,20 @@ html.js [data-reveal].is-visible { opacity: 1; transform: none; }
 }
 .btn-gold:hover:not(:disabled)::after { transform: translateX(120%); }
 
+/* Dashboard charts */
+@keyframes bar-grow { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes bar-slide { from { transform: scaleX(0); } to { transform: none; } }
+.bar-grow { transform-origin: bottom; animation: bar-grow .6s cubic-bezier(.2,.7,.2,1) both; }
+.bar-slide { transform-origin: left; animation: bar-slide .7s cubic-bezier(.2,.7,.2,1) both; }
+/* Forecast = gold with a woven hatch, so it never relies on colour alone */
+.forecast-fill { background: repeating-linear-gradient(135deg, var(--gold-bright) 0 3px, #e6cd8b 3px 6px); }
+
 /* Underline that grows from the left */
 .link-grow { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .3s ease; }
 .link-grow:hover, .link-grow[aria-current] { background-size: 100% 1px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pop-in, .bump, .count-pop, .slide-in-right, .fade-in, .draw-check, .shimmer, .rise { animation: none !important; }
+  .pop-in, .bump, .count-pop, .bar-grow, .bar-slide, .slide-in-right, .fade-in, .draw-check, .shimmer, .rise { animation: none !important; }
   html.js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .btn-gold::after { display: none; }
   * { scroll-behavior: auto !important; }

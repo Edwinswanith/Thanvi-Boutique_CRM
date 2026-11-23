@@ -37,6 +37,7 @@ Built with **Next.js 15 (App Router) · TypeScript · MongoDB (Mongoose) · Tail
 | **Online catalog (CMS)** | *Admin → Online catalog*: photos (drag-and-drop, reorder, cover), title, descriptions, highlights, care, collection, SEO title/description with a Google preview, a publish checklist, and publish/unpublish. Content Editor role. |
 | **Storefront** | Public shop at `/shop`: home, shop by fabric, sort, product page with gallery and zoom, a bag drawer, an About page, and micro-interactions, all on Thanvi branding. |
 | **Search & AI visibility** | Canonicals, Open Graph, `robots.txt`, dynamic `sitemap.xml` with images, `llms.txt`, schema.org JSON-LD (Organization, ClothingStore, Product, Breadcrumb, CollectionPage, FAQPage), fabric guides and FAQs. |
+| **Owner dashboard** | Sales for 7/30/90 days against the previous period, by store, channel (stores, website, Instagram), salesperson, product and payment mode; gross margin (owner only); a 7-day sales forecast; pending payments and live stock. Managers see the same view limited to their own store. |
 | **Audit** | Every material action is logged with user, time, reference and before/after. |
 
 ## Status
@@ -47,7 +48,7 @@ Built with **Next.js 15 (App Router) · TypeScript · MongoDB (Mongoose) · Tail
 | 1 — Inventory | Vendors, receiving, per-piece codes, labels, bins, scan lookup, transfers | ✅ Done |
 | 2 — POS & billing | Scan billing, discounts, GST engine, invoices, Razorpay links + webhook | ✅ Framework done |
 | 3 — Storefront | Online catalog CMS, public shop, bag, SEO/GEO/AEO | 🚧 In progress (checkout not connected yet) |
-| 4 — People & analytics | Staff, attendance, incentives, owner dashboard | ⏳ Planned |
+| 4 — People & analytics | Owner dashboard and forecast ✅ · vendor bills and payments, staff, attendance, salary and incentives ⏳ | 🚧 In progress |
 | 5 — Extras | Vendor portal, stitching, rental, notifications | ⏳ Planned |
 
 What's next, and what's needed from the client: [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
@@ -97,6 +98,7 @@ All secrets live in `.env.local`, which is git-ignored. `.env.example` lists eve
 | `NEXT_PUBLIC_SITE_URL` | ✅ in production | Live domain; drives canonicals, sitemap, JSON-LD and `llms.txt` |
 | `SEED_SUPERADMIN_EMAIL` / `_PASSWORD` | for `npm run seed` | First Super Admin login |
 | `SEED_OWNER_EMAIL` / `_PASSWORD` | for `npm run seed` | First Owner login |
+| `SEED_DEMO_PASSWORD` | optional | Shared password for the sample logins made by `npm run seed:demo` |
 | `RAZORPAY_KEY_ID` / `_KEY_SECRET` / `_WEBHOOK_SECRET` | for online payments | Razorpay API and webhook |
 
 ## Scripts
@@ -111,7 +113,7 @@ All secrets live in `.env.local`, which is git-ignored. `.env.example` lists eve
 | `npm run test:coverage` | Same, with a coverage report |
 | `npm run test:e2e` | Playwright against a production build on port 3100 and a separate `thanvi_boutique_e2e` database |
 | `npm run seed` | Roles, locations, numbering, first users, migrations |
-| `npm run seed:demo` | Load 28 demo sarees; `npm run seed:demo -- --remove` removes them |
+| `npm run seed:demo` | Load 28 demo sarees, 90 days of sample sales (`DEMO-` invoices) and, if `SEED_DEMO_PASSWORD` is set, one sample login per role (`demo-owner@thanvi.test`, `demo-head@`, `demo-store@`, `demo-web@`, `demo-sales@`, `demo-godown@`, `demo-content@`). `npm run seed:demo -- --remove` removes all of it |
 
 ## Project structure
 
@@ -178,6 +180,19 @@ Permissions are `<module>.<action>` (actions: `view create edit delete approve e
 | **Vendor** | Own deliveries (portal planned) |
 
 Users without "all locations" only ever see their assigned locations; this is enforced in the service queries. Confidential fields (cost, margin) are stripped server-side unless the role allows them.
+
+## Dashboard and forecast
+
+The home page (`/admin`) adapts to the person signed in:
+
+- **Owner / Manager Head:** the business overview across all stores and online.
+- **Manager:** the same overview, limited to their own store (enforced in the query).
+- **Salesperson, Godown Staff, Content Editor:** shortcuts to the jobs their role covers.
+- **Super Admin:** the setup desk. No business figures, and the analytics API returns 403.
+
+Only closed or paid invoices count as sales. Days are bucketed in Indian time. Gross margin is shown only to roles with the confidential flag, and only for sales whose product has a cost price.
+
+The forecast (`src/lib/analytics/forecast.ts`) is deliberately simple: for each weekday it averages the last six same weekdays (recent weeks weigh more), adjusts by the recent two-week trend (half-applied, capped), and shows a likely range. It needs about two weeks of billing to pick up the weekly pattern and eight weeks for full confidence.
 
 ## Storefront and online catalog
 

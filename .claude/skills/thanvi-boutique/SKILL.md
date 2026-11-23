@@ -79,6 +79,13 @@ A saree retailer with **godowns** (Godown 1 receives from vendors, Godown 2 dist
 - **Data migrations** go in `src/server/seed/migrations.ts` (append-only, run once each via `npm run seed`). Use them whenever new permissions or defaults must reach an existing database.
 - **Client components must not import runtime values from `@/models`, `@/server` or `@/lib/validation`** (that bundles Mongoose into the browser). `import type` is fine; shared constants go in dependency-free files such as `src/lib/gst/rates.ts`.
 
+## Dashboard & analytics
+- `/admin` is role-aware: Super Admin → setup desk; `dashboard.view` → sales overview (`src/server/services/analytics.ts`, `src/components/admin/dashboard/`); everyone else → shortcuts filtered by permission.
+- Sales = invoices with status `closed` or `paid`. Always apply `locationFilter(actor)`; margin only when `role.confidential`. Bucket days in IST with the helpers in `src/lib/analytics/periods.ts`.
+- The forecast is pure (`src/lib/analytics/forecast.ts`); keep it explainable and show its range and confidence, never a single promised number.
+- Charts are hand-built (no chart library): one hue for magnitude, the hatched gold `.forecast-fill` for forecast, text in ink tokens, a legend and hover read-out. Load the `dataviz` skill before adding a chart.
+- Demo data is always removable and flagged: `DEMO-` invoice numbers, `demo-*@thanvi.test` logins (password from `SEED_DEMO_PASSWORD`), `demo: true` listings.
+
 ## Gotchas learned so far
 - Custom CSS classes (`.btn`, `.field`, `.panel`, …) must stay inside `@layer components` in `globals.css`; unlayered CSS beats Tailwind v4 utilities and breaks things like `lg:hidden`.
 - Forms that submit via `fetch` must keep the submit button disabled until hydrated and declare `method="post"`, so a fast click can never submit natively (and never put a password in a URL).

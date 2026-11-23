@@ -41,9 +41,18 @@ Done: web listings + Online catalog editor (photos, copy, SEO, publish), Content
 - SEO/GEO client actions (store addresses, Search Console, Bing Webmaster, Google Business Profiles, Merchant Center feed): see [SEO.md](SEO.md).
 - Decide the domain plan: keep Shopify for the storefront and sync stock, or move the site to this app.
 
+## People, vendors & analytics (Phase 4)
+Done: owner dashboard (sales by store, channel, salesperson, product, payment mode; margin; 7-day forecast) and role-based home pages.
+Decided with the team on 2026-11-23, to build next:
+- **Vendor payables:** each goods receipt creates a vendor bill (cost price × pieces); staff record full or part payments; dashboard shows paid, pending and overdue per vendor.
+- **Staff and attendance:** managers keep their team list and mark attendance daily (present, absent, half day, leave).
+- **Salary:** a monthly salary per staff member, marked as credited by the manager, with incentive added. Record and track only; no automatic deductions.
+- **Incentives:** needs the client's formula.
+- Add vendor dues, salary paid/pending and attendance to the owner dashboard once those exist.
+- Remove sample sales and demo logins before go-live: `npm run seed:demo -- --remove`.
+
 ## Platform & operations
-- **Reports and owner dashboard** (Phase 4): sales by day, store, channel, salesperson and product; GST summary (GSTR-1-friendly export); best and slow sellers.
-- **Staff, attendance and incentives** (Phase 4).
+- **Reports** (Phase 4): GST summary (GSTR-1-friendly export), slow sellers, exports.
 - **Hosting:** deploy (e.g. Vercel + Atlas), set up a custom domain and HTTPS, Atlas backups, and error monitoring (e.g. Sentry).
 - **Login rate limiting via Redis/Upstash** once there is more than one server instance (today it's in-memory).
 - **Offline POS** decision: if store internet is unreliable, plan a local-first POS with sync.

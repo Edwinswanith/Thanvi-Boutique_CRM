@@ -2,10 +2,11 @@ import mongoose from "mongoose";
 import { E2E_DB } from "../playwright.config";
 import path from "node:path";
 import { seedDemoCatalog } from "../src/server/seed/demoCatalog";
+import { seedDemoSales } from "../src/server/seed/demoSales";
 import { runSeed } from "../src/server/seed/run";
 import { E2E_USERS } from "./users";
 
-/** Resets the dedicated e2e database and seeds it with known test accounts and the demo shop catalog. */
+/** Resets the dedicated e2e database and seeds it with known test accounts the demo shop catalog and sample sales. */
 export default async function globalSetup(): Promise<void> {
   process.loadEnvFile?.(".env.local");
   const uri = process.env.MONGODB_URI;
@@ -15,5 +16,6 @@ export default async function globalSetup(): Promise<void> {
   await mongoose.connection.db!.dropDatabase();
   await runSeed(Object.values(E2E_USERS));
   await seedDemoCatalog(path.join(process.cwd(), "seed-assets", "demo-sarees"));
+  await seedDemoSales();
   await mongoose.disconnect();
 }
