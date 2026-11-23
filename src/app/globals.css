@@ -1,26 +1,188 @@
 @import "tailwindcss";
 
+/* ── Thanvi Boutique brand tokens ─────────────────────────────────
+   Taken from thanviboutique.com and the logo (public/brand/):
+   cream page, logo charcoal, foil gold, maroon accent, Cabin type. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ivory: #fff8f5;        /* site background */
+  --paper: #fffcfa;
+  --card: #ffffff;
+  --ink: #25242b;          /* logo charcoal (sidebar blends with the logo) */
+  --ink-2: #393841;
+  --ink-soft: #6e6863;
+  --line: #efe3db;
+  --line-strong: #dccbbd;
+  --gold: #a07a1f;         /* readable gold for text on cream */
+  --gold-bright: #d5b359;  /* site button / accent gold */
+  --gold-wash: #f8eed3;
+  --saffron: #f0a020;      /* logo foil highlight */
+  --maroon: #7b1e3a;       /* site secondary */
+  --maroon-wash: #f6e4ea;
+  --madder: #b42318;       /* danger */
+  --madder-wash: #fbe7e4;
+  --leaf: #4f6b3a;         /* success */
+  --leaf-wash: #e6ecdc;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ivory: var(--ivory);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-gold-wash: var(--gold-wash);
+  --color-saffron: var(--saffron);
+  --color-maroon: var(--maroon);
+  --color-maroon-wash: var(--maroon-wash);
+  --color-madder: var(--madder);
+  --color-madder-wash: var(--madder-wash);
+  --color-leaf: var(--leaf);
+  --color-leaf-wash: var(--leaf-wash);
+  --font-display: var(--font-cabin);
+  --font-sans: var(--font-cabin);
+  --font-mono: var(--font-plex-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html { background: var(--ivory); }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-cabin), ui-sans-serif, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 100% -10%, rgba(213, 179, 89, 0.12), transparent 60%),
+    var(--ivory);
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Paper grain */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.36 0 0 0 0 0.25 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Component classes live in the components layer so Tailwind utilities
+   (e.g. `lg:hidden`, `w-full`) can still override them. */
+@layer components {
+/* Woven zari border — the signature motif, like a saree pallu edge */
+.zari {
+  background-image:
+    repeating-linear-gradient(135deg, var(--gold) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(45deg, var(--gold-bright) 0 1px, transparent 1px 7px);
+  opacity: 0.85;
+}
+.zari-rule {
+  height: 6px;
+  background:
+    linear-gradient(var(--gold), var(--gold)) top / 100% 1px no-repeat,
+    linear-gradient(var(--gold), var(--gold)) bottom / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--gold) 0 4px, transparent 4px 8px) center / 100% 2px no-repeat;
+  opacity: 0.7;
+}
+
+.display { font-family: var(--font-cabin), sans-serif; font-weight: 500; letter-spacing: -0.015em; }
+/* Gold-foil text, matching the logo lettering */
+.foil {
+  background: linear-gradient(180deg, #fde08a 0%, var(--saffron) 55%, #d9822b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.code { font-family: var(--font-plex-mono), ui-monospace, monospace; letter-spacing: 0.02em; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.5s cubic-bezier(.2,.7,.2,1) both; }
+.rise-1 { animation-delay: 60ms; } .rise-2 { animation-delay: 120ms; }
+.rise-3 { animation-delay: 180ms; } .rise-4 { animation-delay: 240ms; }
+
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+
+/* Form primitives */
+.field {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.925rem;
+  color: var(--ink);
+  transition: border-color .15s, box-shadow .15s;
+}
+.field:focus { outline: none; border-color: var(--ink-2); box-shadow: 0 0 0 3px rgba(213, 179, 89, 0.35); }
+.label { display: block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.35rem; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; border-radius: 6px; padding: .55rem 1rem; font-size: .9rem; font-weight: 600; transition: background .15s, color .15s, border-color .15s, transform .1s; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-primary:hover:not(:disabled) { background: var(--ink-2); }
+.btn-gold { background: var(--gold-bright); color: var(--ink); }
+.btn-gold:hover:not(:disabled) { background: #c9a442; }
+.btn-ghost { border: 1px solid var(--line-strong); color: var(--ink); background: transparent; }
+.btn-ghost:hover:not(:disabled) { border-color: var(--ink); }
+.btn-danger { border: 1px solid var(--madder); color: var(--madder); }
+.btn-danger:hover:not(:disabled) { background: var(--madder-wash); }
+
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 0 rgba(37,36,43,.03), 0 12px 30px -24px rgba(37,36,43,.35); }
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+/* Temple-arch frame used on storefront fabric tiles */
+.arch { border-radius: 999px 999px 6px 6px; }
+
+/* ── Motion system (storefront + editor micro-interactions) ─────────── */
+@keyframes pop-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes bump { 0%,100% { transform: none; } 30% { transform: scale(1.22) rotate(-6deg); } 60% { transform: scale(.94) rotate(3deg); } }
+@keyframes count-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.25); } 100% { transform: none; } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes slide-in-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes draw-check { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+
+.pop-in { animation: pop-in .28s cubic-bezier(.2,.8,.2,1.2) both; }
+.bump { animation: bump .55s cubic-bezier(.3,.7,.4,1) both; }
+.count-pop { animation: count-pop .4s cubic-bezier(.2,.8,.2,1.3) both; }
+.slide-in-right { animation: slide-in-right .38s cubic-bezier(.2,.8,.2,1) both; }
+.fade-in { animation: fade-in .25s ease-out both; }
+.draw-check { stroke-dasharray: 24; animation: draw-check .35s .05s ease-out both; }
+.shimmer {
+  background: linear-gradient(100deg, var(--gold-wash) 30%, #fdf6e6 50%, var(--gold-wash) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* Scroll reveal: only hidden once JS has marked the page, so content never stays invisible. */
+html.js [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity .6s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1); transition-delay: var(--reveal-delay, 0ms); }
+html.js [data-reveal].is-visible { opacity: 1; transform: none; }
+
+/* Gold button shine sweep */
+.btn-gold { position: relative; overflow: hidden; isolation: isolate; }
+.btn-gold::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%);
+  transform: translateX(-120%); transition: transform .7s ease;
+}
+.btn-gold:hover:not(:disabled)::after { transform: translateX(120%); }
+
+/* Underline that grows from the left */
+.link-grow { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .3s ease; }
+.link-grow:hover, .link-grow[aria-current] { background-size: 100% 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pop-in, .bump, .count-pop, .slide-in-right, .fade-in, .draw-check, .shimmer, .rise { animation: none !important; }
+  html.js [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .btn-gold::after { display: none; }
+  * { scroll-behavior: auto !important; }
+}
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
