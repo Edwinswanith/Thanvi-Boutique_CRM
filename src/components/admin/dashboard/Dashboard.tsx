@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RANGE_LABELS, weekdayOf } from "@/lib/analytics/periods";
 import { formatCompactINR, formatINR } from "@/lib/money";
 import type { Overview } from "@/server/services/analytics";
+import type { PayablesSummary } from "@/server/services/payables";
 import { BarList, Card, Delta, Kpi } from "./parts";
 import { SalesChart, type ChartBar } from "./SalesChart";
 
@@ -108,7 +109,37 @@ function OpsStrip({ o }: { o: Overview }) {
   );
 }
 
-export function Dashboard({ o }: { o: Overview }) {
+function VendorDuesCard({ p }: { p: PayablesSummary }) {
+  const stats = [
+    { label: "Overdue", value: formatCompactINR(p.overdue), alert: p.overdue > 0, sub: p.overdueBills ? `${p.overdueBills} bill${p.overdueBills === 1 ? "" : "s"} late` : "Nothing is late" },
+    { label: "Paid, last 30 days", value: formatCompactINR(p.paidLast30), alert: false, sub: `${p.openBills} bill${p.openBills === 1 ? "" : "s"} still open` },
+  ];
+  return (
+    <Card title="Vendor dues" hint="What the business owes its suppliers" className="rise-1">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">To pay vendors</p>
+          <p className="display mt-2 text-4xl font-light" data-testid="vendor-pending">{formatCompactINR(p.pending)}</p>
+          <dl className="mt-4 space-y-3 border-t border-line pt-4 text-sm">
+            {stats.map((s) => (
+              <div key={s.label} className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink-soft">{s.label}<span className="block text-[11px]">{s.sub}</span></dt>
+                <dd className={`code ${s.alert ? "font-semibold text-madder" : ""}`}>{s.alert ? "! " : ""}{s.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <Link href="/admin/payables" className="btn btn-ghost mt-5 text-xs">Open vendor dues →</Link>
+        </div>
+        <div className="lg:col-span-2">
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">Largest pending amounts</p>
+          <BarList ranked shareOf={p.pending} empty="No vendor payments are pending." rows={p.topVendors.map((v) => ({ key: v.vendorId, label: v.vendorName, tag: v.vendorCode, sub: v.overdue ? "has overdue bills" : `${v.openBills} open`, amount: v.pending }))} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function Dashboard({ o, payables }: { o: Overview; payables?: PayablesSummary | null }) {
   const period = `last ${RANGE_LABELS[o.range]}`;
   return (
     <div className="space-y-6">
@@ -163,6 +194,8 @@ export function Dashboard({ o }: { o: Overview }) {
           <BarList ranked shareOf={o.kpis.revenue.value} empty="No sales in this period yet." rows={o.topProducts.map((p) => ({ key: p.sku, label: p.name, tag: p.sku, sub: `${p.pieces} sold`, amount: p.amount }))} />
         </Card>
       </div>
+
+      {payables && <VendorDuesCard p={payables} />}
 
       <OpsStrip o={o} />
     </div>

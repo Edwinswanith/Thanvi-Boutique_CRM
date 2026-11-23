@@ -13,6 +13,7 @@ export const SYSTEM_MODULES = {
 export const DATA_MODULES = {
   dashboard: "Dashboard & metrics",
   vendors: "Vendors",
+  payables: "Vendor bills & payments",
   products: "Products & SKUs",
   inventory: "Inventory",
   transfers: "Stock requests & transfers",

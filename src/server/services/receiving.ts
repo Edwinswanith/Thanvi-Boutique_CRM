@@ -13,6 +13,7 @@ import { assertLocation } from "@/server/scope";
 import { writeAudit } from "./audit";
 import { assertBinAt } from "./bins";
 import { nextCode } from "./numberSeries";
+import { createBillForReceipt } from "./payables";
 
 export interface ReceiptResult {
   receiptRef: string;
@@ -99,6 +100,11 @@ async function writeReceipt(actor: Actor, data: ReceiveData, session: mongoose.C
       actorName: actor.name,
     })),
     { session },
+  );
+  await createBillForReceipt(
+    actor,
+    { vendorId: data.vendorId, locationId: data.locationId, receiptRef, productId: product._id, sku, description: data.name, quantity: codes.length, unitCost: product.costPrice ?? null },
+    session,
   );
   await writeAudit(
     actor,

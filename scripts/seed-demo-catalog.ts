@@ -2,6 +2,7 @@ import path from "node:path";
 import mongoose from "mongoose";
 import { connectDb } from "@/lib/db";
 import { removeDemoCatalog, seedDemoCatalog } from "@/server/seed/demoCatalog";
+import { removeDemoPayables, seedDemoPayables } from "@/server/seed/demoPayables";
 import { removeDemoSales, seedDemoSales } from "@/server/seed/demoSales";
 import { removeDemoUsers, seedDemoUsers } from "@/server/seed/demoUsers";
 
@@ -11,6 +12,7 @@ async function main(): Promise<void> {
   await connectDb();
   if (process.argv.includes("--remove")) {
     console.log(`Removed ${await removeDemoUsers()} demo logins`);
+    console.log(`Removed ${await removeDemoPayables()} demo vendor bills`);
     console.log(`Removed ${await removeDemoSales()} demo invoices`);
     console.log(`Removed ${await removeDemoCatalog()} demo listings`);
     return;
@@ -21,6 +23,8 @@ async function main(): Promise<void> {
   const demoPassword = process.env.SEED_DEMO_PASSWORD;
   if (demoPassword) console.log(`Demo logins: ${(await seedDemoUsers(demoPassword)).length} added (demo-<role>@thanvi.test)`);
   else console.log("Demo logins: skipped (set SEED_DEMO_PASSWORD in .env.local to create one login per role)");
+  const payables = await seedDemoPayables();
+  console.log(payables.skipped ? "Demo vendor bills: already there" : `Demo vendor bills: ${payables.bills} added`);
   console.log(sales.skipped ? "Demo sales: already there" : `Demo sales: ${sales.created} sample invoices added`);
 }
 

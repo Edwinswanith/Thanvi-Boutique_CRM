@@ -38,6 +38,7 @@ Built with **Next.js 15 (App Router) · TypeScript · MongoDB (Mongoose) · Tail
 | **Storefront** | Public shop at `/shop`: home, shop by fabric, sort, product page with gallery and zoom, a bag drawer, an About page, and micro-interactions, all on Thanvi branding. |
 | **Search & AI visibility** | Canonicals, Open Graph, `robots.txt`, dynamic `sitemap.xml` with images, `llms.txt`, schema.org JSON-LD (Organization, ClothingStore, Product, Breadcrumb, CollectionPage, FAQPage), fabric guides and FAQs. |
 | **Owner dashboard** | Sales for 7/30/90 days against the previous period, by store, channel (stores, website, Instagram), salesperson, product and payment mode; gross margin (owner only); a 7-day sales forecast; pending payments and live stock. Managers see the same view limited to their own store. |
+| **Vendor dues** | Every goods receipt raises a vendor bill (cost price × pieces, due in 30 days). Record full or part payments by bank, UPI, cheque or cash; see billed, paid, pending and overdue per vendor. Owner-only by default. |
 | **Audit** | Every material action is logged with user, time, reference and before/after. |
 
 ## Status
@@ -48,7 +49,7 @@ Built with **Next.js 15 (App Router) · TypeScript · MongoDB (Mongoose) · Tail
 | 1 — Inventory | Vendors, receiving, per-piece codes, labels, bins, scan lookup, transfers | ✅ Done |
 | 2 — POS & billing | Scan billing, discounts, GST engine, invoices, Razorpay links + webhook | ✅ Framework done |
 | 3 — Storefront | Online catalog CMS, public shop, bag, SEO/GEO/AEO | 🚧 In progress (checkout not connected yet) |
-| 4 — People & analytics | Owner dashboard and forecast ✅ · vendor bills and payments, staff, attendance, salary and incentives ⏳ | 🚧 In progress |
+| 4 — People & analytics | Owner dashboard and forecast ✅ · vendor bills and payments ✅ · staff, attendance, salary and incentives ⏳ | 🚧 In progress |
 | 5 — Extras | Vendor portal, stitching, rental, notifications | ⏳ Planned |
 
 What's next, and what's needed from the client: [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
@@ -113,7 +114,7 @@ All secrets live in `.env.local`, which is git-ignored. `.env.example` lists eve
 | `npm run test:coverage` | Same, with a coverage report |
 | `npm run test:e2e` | Playwright against a production build on port 3100 and a separate `thanvi_boutique_e2e` database |
 | `npm run seed` | Roles, locations, numbering, first users, migrations |
-| `npm run seed:demo` | Load 28 demo sarees, 90 days of sample sales (`DEMO-` invoices) and, if `SEED_DEMO_PASSWORD` is set, one sample login per role (`demo-owner@thanvi.test`, `demo-head@`, `demo-store@`, `demo-web@`, `demo-sales@`, `demo-godown@`, `demo-content@`). `npm run seed:demo -- --remove` removes all of it |
+| `npm run seed:demo` | Load 28 demo sarees, 90 days of sample sales (`DEMO-` invoices), demo vendors with bills and, if `SEED_DEMO_PASSWORD` is set, one sample login per role (`demo-owner@thanvi.test`, `demo-head@`, `demo-store@`, `demo-web@`, `demo-sales@`, `demo-godown@`, `demo-content@`). `npm run seed:demo -- --remove` removes all of it |
 
 ## Project structure
 

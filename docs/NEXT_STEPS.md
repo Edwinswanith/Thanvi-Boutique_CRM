@@ -42,13 +42,13 @@ Done: web listings + Online catalog editor (photos, copy, SEO, publish), Content
 - Decide the domain plan: keep Shopify for the storefront and sync stock, or move the site to this app.
 
 ## People, vendors & analytics (Phase 4)
-Done: owner dashboard (sales by store, channel, salesperson, product, payment mode; margin; 7-day forecast) and role-based home pages.
+Done: owner dashboard (sales by store, channel, salesperson, product, payment mode; margin; 7-day forecast), role-based home pages, and vendor dues (a bill per delivery, part payments, pending and overdue per vendor, dashboard card).
 Decided with the team on 2026-11-23, to build next:
-- **Vendor payables:** each goods receipt creates a vendor bill (cost price × pieces); staff record full or part payments; dashboard shows paid, pending and overdue per vendor.
+- Vendor dues follow-ups: credit days per vendor (30 for all today), GST on vendor bills (input tax credit), one payment across several bills, advance payments, a vendor statement to print or export, and returns to vendor (debit notes).
 - **Staff and attendance:** managers keep their team list and mark attendance daily (present, absent, half day, leave).
 - **Salary:** a monthly salary per staff member, marked as credited by the manager, with incentive added. Record and track only; no automatic deductions.
 - **Incentives:** needs the client's formula.
-- Add vendor dues, salary paid/pending and attendance to the owner dashboard once those exist.
+- Add salary paid/pending and attendance to the owner dashboard once those exist.
 - Remove sample sales and demo logins before go-live: `npm run seed:demo -- --remove`.
 
 ## Platform & operations

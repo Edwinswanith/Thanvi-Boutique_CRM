@@ -33,6 +33,7 @@ export const NAV: NavSection[] = [
   {
     title: "Business",
     items: [
+      { href: "/admin/payables", label: "Vendor dues", permission: "payables.view" },
       { href: "/admin/catalog", label: "Online catalog", permission: "catalog.view" },
       { href: "/admin/settings/gst", label: "GST & invoice", permission: "taxes.view" },
     ],

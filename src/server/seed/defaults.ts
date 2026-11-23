@@ -149,4 +149,5 @@ export const DEFAULT_SERIES = [
   { key: "transfer", label: "Transfer reference", prefix: "TR-", next: 1, padding: 5 },
   { key: "order", label: "Online / Instagram order", prefix: "ORD-", next: 1, padding: 6 },
   { key: "receipt", label: "Goods receipt (GRN)", prefix: "GRN-", next: 1, padding: 5 },
+  { key: "vendorBill", label: "Vendor bill", prefix: "VB-", next: 1, padding: 5 },
 ] as const;

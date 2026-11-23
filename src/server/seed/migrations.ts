@@ -55,6 +55,12 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    key: "2026-11-23-payables-module",
+    run: async () => {
+      await Role.updateOne({ slug: "owner" }, { $addToSet: { permissions: { $each: permissionsFor(["payables"]) } } });
+    },
+  },
 ];
 
 export async function runMigrations(): Promise<string[]> {

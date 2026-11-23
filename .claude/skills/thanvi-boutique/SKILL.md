@@ -84,7 +84,12 @@ A saree retailer with **godowns** (Godown 1 receives from vendors, Godown 2 dist
 - Sales = invoices with status `closed` or `paid`. Always apply `locationFilter(actor)`; margin only when `role.confidential`. Bucket days in IST with the helpers in `src/lib/analytics/periods.ts`.
 - The forecast is pure (`src/lib/analytics/forecast.ts`); keep it explainable and show its range and confidence, never a single promised number.
 - Charts are hand-built (no chart library): one hue for magnitude, the hatched gold `.forecast-fill` for forecast, text in ink tokens, a legend and hover read-out. Load the `dataviz` skill before adding a chart.
-- Demo data is always removable and flagged: `DEMO-` invoice numbers, `demo-*@thanvi.test` logins (password from `SEED_DEMO_PASSWORD`), `demo: true` listings.
+- Demo data is always removable and flagged: `DEMO-` invoice numbers, `demo-*@thanvi.test` logins (password from `SEED_DEMO_PASSWORD`), `demo: true` listings, vendor bills and payments (`DEMOV…` vendors).
+
+## Vendor dues (payables)
+- `receiveStock` creates a `VendorBill` in the same transaction (`createBillForReceipt`): amount = cost price × pieces; no cost price → status `draft` until someone enters the amount.
+- `recordPayment` is the only way `paidAmount` changes: one conditional pipeline update (`paid + amount ≤ bill amount`) plus a `VendorPayment` row and an audit row in a transaction. Payments are append-only; the amount locks after the first payment.
+- Permission module `payables` (view / create = record payment / edit = bill details). Owner only by default, because bills reveal cost prices. Shared constants live in `src/lib/payables.ts` (client-safe).
 
 ## Gotchas learned so far
 - Custom CSS classes (`.btn`, `.field`, `.panel`, …) must stay inside `@layer components` in `globals.css`; unlayered CSS beats Tailwind v4 utilities and breaks things like `lg:hidden`.

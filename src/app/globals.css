@@ -117,6 +117,7 @@ body::before {
   color: var(--ink);
   transition: border-color .15s, box-shadow .15s;
 }
+.field:disabled { background: var(--paper); color: var(--ink-soft); cursor: not-allowed; }
 .field:focus { outline: none; border-color: var(--ink-2); box-shadow: 0 0 0 3px rgba(213, 179, 89, 0.35); }
 .label { display: block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.35rem; }
 

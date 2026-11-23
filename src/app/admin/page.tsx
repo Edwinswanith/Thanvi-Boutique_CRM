@@ -11,6 +11,7 @@ import { User } from "@/models/User";
 import { can, canAccessLocation, type Actor } from "@/server/actor";
 import { pageActor } from "@/server/page";
 import { salesOverview } from "@/server/services/analytics";
+import { payablesSummary } from "@/server/services/payables";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -30,6 +31,7 @@ const WORK_LINKS: Shortcut[] = [
   { href: "/admin/inventory/receive", title: "Receive stock", text: "Add a new product with a photo, get codes and print barcode labels.", permission: "inventory.create" },
   { href: "/admin/transfers", title: "Stock requests", text: "Ask the godown for stock, send it, and scan it in when it arrives.", permission: "transfers.view" },
   { href: "/admin/billing/invoices", title: "Invoices", text: "Look up past bills and pending payments.", permission: "sales.view" },
+  { href: "/admin/payables", title: "Vendor dues", text: "See what is owed to each vendor and record payments.", permission: "payables.view" },
   { href: "/admin/catalog", title: "Online catalog", text: "Add photos and descriptions, then publish sarees to the website.", permission: "catalog.view" },
 ];
 
@@ -89,7 +91,10 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const range = parseRange(sp.range);
   const locationId = sp.store && canAccessLocation(actor, sp.store) ? sp.store : null;
-  const o = await salesOverview(actor, { range, locationId });
+  const [o, payables] = await Promise.all([
+    salesOverview(actor, { range, locationId }),
+    can(actor, "payables.view") ? payablesSummary(actor) : null,
+  ]);
   const locations = [...o.byLocation].sort((a, b) => a.name.localeCompare(b.name)).map((l) => ({ id: l.id, name: l.name }));
   const selected = locations.find((l) => l.id === locationId);
   const scopeText = selected ? selected.name : actor.role.allLocations ? "All stores and online" : locations.map((l) => l.name).join(", ") || "No store assigned yet";
@@ -102,7 +107,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         description={`${scopeText}. Sales, best performers and what to expect next week.`}
         actions={<Filters range={range} locationId={locationId} locations={locations} />}
       />
-      <Dashboard o={o} />
+      <Dashboard o={o} payables={payables} />
     </>
   );
 }

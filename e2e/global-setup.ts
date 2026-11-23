@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { E2E_DB } from "../playwright.config";
 import path from "node:path";
 import { seedDemoCatalog } from "../src/server/seed/demoCatalog";
+import { seedDemoPayables } from "../src/server/seed/demoPayables";
 import { seedDemoSales } from "../src/server/seed/demoSales";
 import { runSeed } from "../src/server/seed/run";
 import { E2E_USERS } from "./users";
@@ -17,5 +18,6 @@ export default async function globalSetup(): Promise<void> {
   await runSeed(Object.values(E2E_USERS));
   await seedDemoCatalog(path.join(process.cwd(), "seed-assets", "demo-sarees"));
   await seedDemoSales();
+  await seedDemoPayables();
   await mongoose.disconnect();
 }
