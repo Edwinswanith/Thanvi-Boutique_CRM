@@ -4,8 +4,9 @@ import { addDays, fillDays, istDay, pctChange, rangeWindow, startOfIstDay, TIMEZ
 import { Invoice } from "@/models/Invoice";
 import { Item } from "@/models/Item";
 import { Location } from "@/models/Location";
+import { Order } from "@/models/Order";
 import { Product } from "@/models/Product";
-import type { Actor } from "@/server/actor";
+import { can, type Actor } from "@/server/actor";
 import { assertLocation, locationFilter, oid } from "@/server/scope";
 
 /** Invoices that count as sales. Open (awaiting payment) and cancelled ones don't. */
@@ -44,9 +45,27 @@ export interface Overview {
   /** Only for roles allowed to see cost. `coveredPct` = share of sales that has a cost price on record. */
   margin: { amount: number; pct: number; coveredPct: number } | null;
   pending: { count: number; amount: number };
+  websiteOrders: { invoiced: { count: number; amount: number }; dummy: { count: number; amount: number }; cod: { count: number; amount: number }; cancelled: number } | null;
   stock: { available: number; inTransit: number; reserved: number };
   forecast: Forecast;
   hasDemo: boolean;
+}
+
+async function websiteOrders(actor: Actor, match: Record<string, unknown>): Promise<Overview["websiteOrders"]> {
+  if (!can(actor, "orders.view")) return null;
+  const [rows, invoiced] = await Promise.all([Order.aggregate<Group>([
+    { $match: { ...match, test: true } },
+    { $group: {
+      _id: { $cond: [{ $eq: ["$status", "cancelled"] }, "cancelled", "$paymentMethod"] },
+      amount: { $sum: "$total" },
+      count: { $sum: 1 },
+    } },
+  ]), totalsFor({ ...match, channel: "online", status: { $in: SOLD }, number: { $not: { $regex: `^${DEMO_INVOICE_PREFIX}` } } })]);
+  const summary = (method: string) => {
+    const row = rows.find((entry) => entry._id === method);
+    return { count: row?.count ?? 0, amount: row?.amount ?? 0 };
+  };
+  return { invoiced: { count: invoiced.count, amount: invoiced.amount }, dummy: summary("dummy"), cod: summary("cod"), cancelled: summary("cancelled").count };
 }
 
 const money = { amount: { $sum: "$totals.grandTotal" }, count: { $sum: 1 } };
@@ -101,15 +120,28 @@ async function dailyHistory(base: Record<string, unknown>, now: Date): Promise<D
   return fillDays(days, rows.map((r) => ({ date: r._id, amount: r.amount, count: r.count })));
 }
 
-async function marginFor(actor: Actor, skus: readonly SkuGroup[]): Promise<Overview["margin"]> {
-  if (!actor.role.confidential || skus.length === 0) return null;
-  const products = await Product.find({ sku: { $in: skus.map((s) => s._id) }, costPrice: { $ne: null } }).select("sku +costPrice").lean();
-  const costBySku = new Map(products.map((p) => [p.sku, p.costPrice ?? 0]));
-  const covered = skus.filter((s) => costBySku.has(s._id));
-  const coveredTaxable = covered.reduce((a, s) => a + s.taxable, 0);
-  const totalTaxable = skus.reduce((a, s) => a + s.taxable, 0);
-  if (coveredTaxable <= 0) return null;
-  const cost = covered.reduce((a, s) => a + costBySku.get(s._id)! * s.pieces, 0);
+async function marginFor(actor: Actor, match: Record<string, unknown>): Promise<Overview["margin"]> {
+  if (!actor.role.confidential) return null;
+  const [totals] = await Invoice.aggregate<{ coveredTaxable: number; totalTaxable: number; cost: number }>([
+    { $match: match },
+    { $unwind: "$lines" },
+    { $lookup: { from: Item.collection.name, localField: "lines.itemId", foreignField: "_id", as: "piece" } },
+    { $lookup: { from: Product.collection.name, localField: "lines.sku", foreignField: "sku", as: "product" } },
+    { $set: { cost: {
+      $let: {
+        vars: { piece: { $arrayElemAt: ["$piece", 0] }, product: { $arrayElemAt: ["$product", 0] } },
+        in: { $cond: [{ $eq: [{ $type: "$$piece.purchaseCost" }, "missing"] }, "$$product.costPrice", "$$piece.purchaseCost"] },
+      },
+    } } },
+    { $group: {
+      _id: null,
+      totalTaxable: { $sum: "$lines.taxable" },
+      coveredTaxable: { $sum: { $cond: [{ $isNumber: "$cost" }, "$lines.taxable", 0] } },
+      cost: { $sum: "$cost" },
+    } },
+  ]);
+  if (!totals || totals.coveredTaxable <= 0) return null;
+  const { coveredTaxable, totalTaxable, cost } = totals;
   const amount = coveredTaxable - cost;
   return { amount, pct: Math.round((amount / coveredTaxable) * 1000) / 10, coveredPct: Math.round((coveredTaxable / totalTaxable) * 100) };
 }
@@ -150,14 +182,17 @@ export async function salesOverview(actor: Actor, opts: { range: RangeKey; locat
   const locScope = opts.locationId ? { locationId: oid(opts.locationId, "location") } : scope;
   const base = { ...locScope, status: { $in: SOLD } };
   const w = rangeWindow(opts.range, now);
+  const current = { ...base, createdAt: { $gte: w.from, $lte: w.to } };
 
-  const [f, prev, history, pending, stock, hasDemo] = await Promise.all([
-    facets({ ...base, createdAt: { $gte: w.from, $lte: w.to } }),
+  const [f, prev, history, pending, stock, hasDemo, margin, shopTestOrders] = await Promise.all([
+    facets(current),
     totalsFor({ ...base, createdAt: { $gte: w.prevFrom, $lt: w.from } }),
     dailyHistory(base, now),
     totalsFor({ ...locScope, status: "open" }),
     stockFor(locScope),
     Invoice.exists({ ...locScope, number: { $regex: `^${DEMO_INVOICE_PREFIX}` } }),
+    marginFor(actor, current),
+    websiteOrders(actor, { ...locScope, createdAt: current.createdAt }),
   ]);
   const t = f.totals[0] ?? ZERO;
 
@@ -180,8 +215,9 @@ export async function salesOverview(actor: Actor, opts: { range: RangeKey; locat
     bySalesperson: byAmount(f.bySalesperson.map((s) => ({ name: s._id || "Unassigned", amount: s.amount, count: s.count, pieces: s.pieces ?? 0 }))).slice(0, TOP_N),
     byPayment: byAmount(f.byPayment.map((p) => ({ mode: p._id, amount: p.amount }))),
     topProducts: byAmount(f.bySku.map((s) => ({ sku: s._id, name: s.name, pieces: s.pieces, amount: s.amount }))).slice(0, TOP_N),
-    margin: await marginFor(actor, f.bySku),
+    margin,
     pending: { count: pending.count, amount: pending.amount },
+    websiteOrders: shopTestOrders,
     stock,
     forecast: forecastSales(history.map((d) => ({ date: d.date, amount: d.amount })), FORECAST_HORIZON, addDays(istDay(now), 1)),
     hasDemo: Boolean(hasDemo),

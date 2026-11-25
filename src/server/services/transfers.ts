@@ -1,11 +1,11 @@
-import mongoose, { Types } from "mongoose";
+import mongoose, { Types, type ClientSession } from "mongoose";
 import { z } from "zod";
 import { AppError } from "@/lib/api";
 import { codesSchema, transferRequestSchema } from "@/lib/validation/inventory";
 import { Location } from "@/models/Location";
 import { Transfer, type TransferStatus } from "@/models/Transfer";
 import type { Actor } from "@/server/actor";
-import { canAccessLocation } from "@/server/actor";
+import { can, canAccessLocation } from "@/server/actor";
 import { assertLocation, oid } from "@/server/scope";
 import { writeAudit } from "./audit";
 import { assertBinAt } from "./bins";
@@ -33,8 +33,8 @@ export interface TransferView {
 }
 
 type TransferLean = Awaited<ReturnType<typeof loadRaw>>;
-async function loadRaw(id: string) {
-  const t = await Transfer.findById(oid(id, "transfer")).lean();
+async function loadRaw(id: string, session?: ClientSession) {
+  const t = await Transfer.findById(oid(id, "transfer")).session(session ?? null).lean();
   if (!t) throw new AppError("Transfer not found", 404);
   return t;
 }
@@ -90,8 +90,12 @@ export async function createTransfer(actor: Actor, input: unknown): Promise<Tran
   const data = transferRequestSchema.parse(input);
   if (data.fromLocationId === data.toLocationId) throw new AppError("Source and destination must differ", 422);
   assertLocation(actor, data.direct ? data.fromLocationId : data.toLocationId);
-  const count = await Location.countDocuments({ _id: { $in: [data.fromLocationId, data.toLocationId] }, active: true });
-  if (count !== 2) throw new AppError("Both locations must exist and be active", 422);
+  const locations = await Location.find({ _id: { $in: [data.fromLocationId, data.toLocationId] }, active: true }, { type: 1 }).lean();
+  const from = locations.find((location) => String(location._id) === data.fromLocationId);
+  const to = locations.find((location) => String(location._id) === data.toLocationId);
+  if (!from || !to) throw new AppError("Both locations must exist and be active", 422);
+  if (data.direct && !can(actor, "transfers.edit")) throw new AppError("Sending stock requires dispatch access", 403);
+  if (!data.direct && (from.type !== "godown" || to.type !== "store")) throw new AppError("Request stock for a shop from a godown", 422);
   if (!data.direct && data.lines.length === 0) throw new AppError("Add at least one line to the request", 422);
 
   const ref = await nextCode("transfer");
@@ -179,20 +183,19 @@ const receiveInput = codesSchema
  */
 export async function receiveTransfer(actor: Actor, id: string, input: unknown): Promise<TransferView> {
   const { codes, binId, final } = receiveInput.parse(input);
-  const t = await loadRaw(id);
-  assertLocation(actor, String(t.toLocationId));
-  if (t.status !== "in_transit") throw new AppError("Only in-transit transfers can be received", 409);
-  await assertBinAt(binId, String(t.toLocationId));
-  const expected = new Map(t.items.map((i) => [i.code, i]));
   const scanned = [...new Set(codes)];
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
+      const t = await loadRaw(id, session);
+      assertLocation(actor, String(t.toLocationId));
+      if (t.status !== "in_transit") throw new AppError("Only in-transit transfers can be received", 409);
+      await assertBinAt(binId, String(t.toLocationId));
+      const expected = new Set(t.items.map((item) => item.code));
       const received = new Set(t.items.filter((i) => i.received).map((i) => i.code));
       const excess = new Set(t.excessCodes);
       for (const code of scanned) {
-        const line = expected.get(code);
-        if (!line) {
+        if (!expected.has(code)) {
           excess.add(code);
           continue;
         }

@@ -1,4 +1,4 @@
-import { permissionsFor } from "@/lib/rbac/permissions";
+import { permissionsFor, SYSTEM_MODULES, type SystemModule } from "@/lib/rbac/permissions";
 import { AppMeta } from "@/models/AppMeta";
 import { InvoiceSettings } from "@/models/InvoiceSettings";
 import { Role } from "@/models/Role";
@@ -59,6 +59,41 @@ const MIGRATIONS: Migration[] = [
     key: "2026-11-23-payables-module",
     run: async () => {
       await Role.updateOne({ slug: "owner" }, { $addToSet: { permissions: { $each: permissionsFor(["payables"]) } } });
+    },
+  },
+  {
+    key: "2026-11-23-vendor-directory-access",
+    run: async () => {
+      await Role.updateOne({ slug: "vendor" }, { $pull: { permissions: /^vendors\./ } });
+    },
+  },
+  {
+    key: "2026-11-25-role-workspaces",
+    run: async () => {
+      await Role.updateOne(
+        { slug: "owner", builtIn: true },
+        { $addToSet: { permissions: { $each: permissionsFor([...Object.keys(SYSTEM_MODULES) as SystemModule[], "counts"]) } } },
+      );
+      await Role.updateMany(
+        { slug: { $in: ["manager-head", "manager"] }, builtIn: true },
+        { $addToSet: { permissions: { $each: permissionsFor(["counts"], ["view", "create", "edit", "approve"]) } } },
+      );
+      await Role.updateOne(
+        { slug: "godown-staff", builtIn: true },
+        { $addToSet: { permissions: { $each: permissionsFor(["counts"], ["view", "create", "edit"]) } } },
+      );
+      await Role.updateOne({ slug: "godown-staff", builtIn: true }, { $pull: { permissions: "vendors.view" } });
+      await Role.updateOne(
+        { slug: "manager-head", builtIn: true },
+        { $pull: { permissions: /^(taxes|vendors|catalog)\./ } },
+      );
+      for (const [slug, priorName, name] of [
+        ["owner", "Owner", "Owner / Admin"],
+        ["super-admin", "Super Admin", "Setup Admin"],
+        ["manager", "Manager", "Shop Manager"],
+      ]) {
+        if (!(await Role.exists({ name }))) await Role.updateOne({ slug, builtIn: true, name: priorName }, { $set: { name } });
+      }
     },
   },
 ];

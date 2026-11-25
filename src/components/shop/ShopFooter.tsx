@@ -34,7 +34,7 @@ export function ShopFooter() {
       </div>
       <div className="border-t border-paper/10">
         <p className="mx-auto max-w-7xl px-4 py-5 text-[11px] text-paper/40 sm:px-6">
-          Storefront preview · content managed in Admin → Online catalog · checkout connects to Razorpay in Phase 3
+          Thanvi Boutique · Handloom sarees
         </p>
       </div>
     </footer>

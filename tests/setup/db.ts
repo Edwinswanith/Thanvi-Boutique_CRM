@@ -12,6 +12,7 @@ export function setupTestDb(): void {
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
     await mongoose.connect(replSet.getUri(), { dbName: "tb_test" });
+    await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
   });
 
   beforeEach(async () => {
@@ -36,6 +37,8 @@ export async function actorWithRole(slug: string, overrides: Partial<Actor> = {}
     role: {
       id: String(role._id),
       name: role.name,
+      slug: role.slug,
+      builtIn: role.builtIn,
       permissions: role.permissions,
       isSystem: role.isSystem,
       confidential: role.confidential,

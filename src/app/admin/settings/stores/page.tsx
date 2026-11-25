@@ -5,7 +5,7 @@ import { pageActor } from "@/server/page";
 import { listLocations } from "@/server/services/locations";
 import { StoresManager } from "./StoresManager";
 
-export const metadata: Metadata = { title: "Stores & godowns" };
+export const metadata: Metadata = { title: "Locations" };
 
 export default async function StoresPage() {
   const { actor, allowed } = await pageActor("system.locations.view");
@@ -14,9 +14,8 @@ export default async function StoresPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Setup · Locations"
-        title="Stores & godowns"
-        description="Every place stock can live. A new store gets its own inventory, billing counter and invoice series as soon as it is created."
+        title="Locations"
+        description="Manage shops, godowns and online stock locations."
       />
       <StoresManager
         initial={locations}

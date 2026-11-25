@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { Item } from "@/models/Item";
 import { Location } from "@/models/Location";
+import { Product } from "@/models/Product";
+import { WebListing } from "@/models/WebListing";
 import { StockMovement } from "@/models/StockMovement";
 import type { Actor } from "@/server/actor";
 import { createBin, createBinGrid, listBins } from "@/server/services/bins";
 import { itemHistory, lookupItem, moveItemToBin } from "@/server/services/items";
 import { receiveStock } from "@/server/services/receiving";
 import { listProducts, stockSummary } from "@/server/services/stock";
+import { approveStockCount, getStockCount, saveStockCount, startStockCount } from "@/server/services/stockCounts";
+import { getPublishedBySlug } from "@/server/services/storefront";
 import {
   approveTransfer,
   cancelTransfer,
@@ -34,7 +38,7 @@ export async function scenario() {
   const vendor = await createVendor(godown, { name: "Kanchi Weavers" });
   await createBinGrid(godown, { locationId: gd1, racks: 2, shelves: 2 });
   const bins = await listBins(godown, gd1);
-  const receipt = await receiveStock(godown, {
+  const receipt = await receiveStock(owner, {
     vendorId: vendor.id, locationId: gd1, binId: bins[0].id, name: "Kanchipuram silk", category: "Silk saree",
     hsn: "5007", mrp: 10_500, costPrice: 6_200, quantity: 3, color: "Peacock blue",
   });
@@ -54,11 +58,70 @@ describe("receiving", () => {
   });
 
   it("rejects receiving at someone else's location or into a foreign bin", async () => {
-    const { manager, vendor, gd1, sh1, bins } = await scenario();
+    const { owner, manager, godown, vendor, gd1, sh1, bins } = await scenario();
     const base = { vendorId: vendor.id, name: "X saree", category: "Saree", hsn: "5208", mrp: 900, quantity: 1 };
     await expect(receiveStock(manager, { ...base, locationId: gd1 })).rejects.toThrow("access");
-    await expect(receiveStock(manager, { ...base, locationId: sh1, binId: bins[0].id })).rejects.toThrow("bin");
+    await expect(receiveStock(owner, { ...base, locationId: sh1, binId: bins[0].id })).rejects.toThrow("bin");
+    await expect(receiveStock(manager, { ...base, locationId: sh1 })).rejects.toThrow("designated receiving godown");
+    await expect(receiveStock(godown, { ...base, locationId: gd1, costPrice: 400 })).rejects.toThrow("confidential");
     await expect(receiveStock(manager, { ...base, locationId: sh1, hsn: "12" })).rejects.toThrow();
+  });
+
+  it("restocks an existing listing with consecutive barcodes across concurrent receipts", async () => {
+    const { receipt, vendor, gd1, owner } = await scenario();
+    await WebListing.create({ productId: receipt.productId, slug: "restock-silk", title: "Restock silk", status: "published" });
+    const input = { existingSku: "tb1000", vendorId: vendor.id, locationId: gd1, quantity: 2, costPrice: 6500 };
+    const restocks = await Promise.all([receiveStock(owner, input), receiveStock(owner, input)]);
+    expect(restocks.every((result) => result.productId === receipt.productId && result.sku === receipt.sku)).toBe(true);
+    expect(restocks.flatMap((result) => result.codes).sort()).toEqual(["TB1000-004", "TB1000-005", "TB1000-006", "TB1000-007"]);
+    expect(await Product.countDocuments()).toBe(1);
+    expect(await WebListing.countDocuments({ productId: receipt.productId, status: "published" })).toBe(1);
+    await expect(receiveStock(owner, { ...input, existingSku: "UNKNOWN" })).rejects.toMatchObject({ status: 404 });
+    const web = await locId("WEB");
+    const transfer = await createTransfer(owner, { fromLocationId: gd1, toLocationId: web, direct: true });
+    await dispatchTransfer(owner, transfer.id, { codes: ["TB1000-004"] });
+    expect(await getPublishedBySlug("restock-silk")).toMatchObject({ availableQuantity: 0 });
+    await receiveTransfer(owner, transfer.id, { codes: ["TB1000-004"] });
+    expect(await getPublishedBySlug("restock-silk")).toMatchObject({ availableQuantity: 1, price: 1_050_000 });
+  });
+});
+
+describe("stock counts", () => {
+  it("posts missing and found pieces once with the original barcode and scope", async () => {
+    const { owner, godown, manager, gd1, receipt } = await scenario();
+    const [first, second, third] = receipt.codes;
+    const count = await startStockCount(godown, { locationId: gd1, sku: receipt.sku });
+    await expect(getStockCount(manager, count.id)).rejects.toThrow("not found");
+    const draft = await getStockCount(godown, count.id);
+    const submitted = await saveStockCount(godown, count.id, { version: draft.version, codes: [first, first, second], finish: true, reason: "Missing on shelf" });
+    expect(submitted).toMatchObject({ status: "review", missingCodes: [third], scanned: 2 });
+    expect(await Item.countDocuments({ locationId: gd1, status: "available" })).toBe(3);
+    await approveStockCount(owner, count.id);
+    await expect(approveStockCount(owner, count.id)).rejects.toThrow("awaiting review");
+    expect(await Item.countDocuments({ locationId: gd1, status: "available" })).toBe(2);
+
+    const recount = await startStockCount(godown, { locationId: gd1 });
+    const saved = await saveStockCount(godown, recount.id, {
+      version: (await getStockCount(godown, recount.id)).version, codes: receipt.codes,
+      finish: true, reason: "Original piece found",
+    });
+    expect(saved.foundCodes).toEqual([third]);
+    await approveStockCount(owner, recount.id);
+    expect(await Item.countDocuments({ locationId: gd1, status: "available" })).toBe(3);
+    expect(await StockMovement.countDocuments({ code: third, type: "adjustment" })).toBe(2);
+  });
+
+  it("stops approval when stock moved during review", async () => {
+    const { owner, godown, gd1, sh1, receipt } = await scenario();
+    const count = await startStockCount(godown, { locationId: gd1 });
+    await saveStockCount(godown, count.id, {
+      version: (await getStockCount(godown, count.id)).version, codes: receipt.codes.slice(0, 2),
+      finish: true, reason: "One piece missing",
+    });
+    const transfer = await createTransfer(godown, { fromLocationId: gd1, toLocationId: sh1, direct: true });
+    await dispatchTransfer(godown, transfer.id, { codes: [receipt.codes[2]] });
+    await expect(approveStockCount(owner, count.id)).rejects.toThrow("Stock moved");
+    expect(await StockMovement.countDocuments({ type: "adjustment" })).toBe(0);
   });
 });
 
@@ -96,6 +159,21 @@ describe("scan lookup", () => {
 });
 
 describe("stock request → dispatch → receive", () => {
+  it("keeps both batches when two receiving sessions scan different pieces", async () => {
+    const { godown, manager, gd1, sh1, receipt } = await scenario();
+    const transfer = await createTransfer(godown, { fromLocationId: gd1, toLocationId: sh1, direct: true });
+    const [first, second] = receipt.codes;
+    await dispatchTransfer(godown, transfer.id, { codes: [first, second] });
+    await Promise.all([
+      receiveTransfer(manager, transfer.id, { codes: [first] }),
+      receiveTransfer(manager, transfer.id, { codes: [second] }),
+    ]);
+    const completed = await getTransfer(manager, transfer.id);
+    expect(completed.status).toBe("received");
+    expect(completed.items.every((piece) => piece.received)).toBe(true);
+    expect(await Item.countDocuments({ locationId: sh1, status: "available" })).toBe(2);
+  });
+
   it("moves stock exactly and records short and excess pieces", async () => {
     const { godown, manager, owner, gd1, sh1 } = await scenario();
     const req = await createTransfer(manager, { fromLocationId: gd1, toLocationId: sh1, lines: [{ sku: "TB1000", qty: 2 }] });

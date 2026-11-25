@@ -114,7 +114,7 @@ describe("users", () => {
       name: "Priya", email: "Priya@Thanvi.in", password: "storepass123", roleId: manager.id, locationIds: [sh1.id],
     });
     expect(user.email).toBe("priya@thanvi.in");
-    expect(user.roleName).toBe("Manager");
+    expect(user.roleName).toBe("Shop Manager");
     const raw = await User.findById(user.id).select("+passwordHash").lean();
     expect(raw!.passwordHash).not.toContain("storepass123");
     const audit = await AuditLog.findOne({ action: "user.create" }).lean();
@@ -136,17 +136,32 @@ describe("users", () => {
 
   it("stops users changing their own role or deactivating themselves", async () => {
     const sa = await actorWithRole("super-admin");
+    const admin = await actorWithRole("owner");
     const roles = await listRoles();
-    const created = await createUser(sa, {
+    const created = await createUser(admin, {
       name: "Root", email: "root@x.com", password: "longpassword1", roleId: roles.find((r) => r.slug === "super-admin")!.id,
     });
     const self = { ...sa, id: created.id };
     const owner = roles.find((r) => r.slug === "owner")!;
     await expect(updateUser(self, created.id, { roleId: owner.id })).rejects.toThrow("own role");
     await expect(deactivateUser(self, created.id)).rejects.toThrow("own account");
-    const other = await deactivateUser(sa, created.id);
+    await expect(deactivateUser(sa, created.id)).rejects.toThrow("Owner / Admin");
+    const other = await deactivateUser(admin, created.id);
     expect(other.active).toBe(false);
     await expect(updateUser(sa, "bad-id", { name: "Xy" })).rejects.toThrow("not found");
+  });
+
+  it("keeps protected roles and credentials under Owner / Admin", async () => {
+    const setup = await actorWithRole("super-admin");
+    const admin = await actorWithRole("owner");
+    const protectedUser = {
+      name: "Business administrator", email: "business@thanvi.test", password: "longpassword1", roleId: admin.role.id,
+    };
+    await expect(createUser(setup, protectedUser)).rejects.toThrow("Owner / Admin");
+    const user = await createUser(admin, protectedUser);
+    await expect(updateUser(setup, user.id, { password: "anotherpassword1" })).rejects.toThrow("Owner / Admin");
+    await expect(createRole(setup, { name: "Costs", confidential: true })).rejects.toThrow("confidential access");
+    expect((await createRole(admin, { name: "Costs", confidential: true })).confidential).toBe(true);
   });
 });
 

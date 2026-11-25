@@ -1,24 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Forbidden, PageHeader } from "@/components/admin/PageHeader";
-import { SubNav } from "@/components/admin/ui";
 import { formatINR } from "@/lib/money";
 import { pageActor } from "@/server/page";
 import { listProducts } from "@/server/services/stock";
-import { INVENTORY_TABS } from "../tabs";
 
 export const metadata: Metadata = { title: "Products" };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { actor, allowed } = await pageActor("products.view");
-  if (!allowed) return <Forbidden />;
+  if (!allowed || !can(actor, "inventory.view")) return <Forbidden />;
   const q = (await searchParams).q ?? "";
   const products = await listProducts(actor, q);
   const showCost = actor.role.confidential;
   return (
     <>
       <PageHeader eyebrow="Inventory · Catalogue" title="Products" description="Every SKU received, with how many pieces are available and sold at your locations." />
-      <SubNav tabs={INVENTORY_TABS} />
       <form className="rise mb-4 flex gap-2" action="/admin/inventory/products">
         <input name="q" defaultValue={q} className="field max-w-sm" placeholder="Search SKU, name or category" aria-label="Search products" />
         <button className="btn btn-ghost">Search</button>
@@ -58,7 +55,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               </tr>
             ))}
             {!products.length && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-ink-soft">No products yet. <Link className="underline" href="/admin/inventory/receive">Receive your first stock</Link>.</td></tr>
+              <tr><td colSpan={showCost ? 6 : 5} className="px-5 py-10 text-center text-ink-soft">No matching products at your locations. <Link className="underline" href="/admin/inventory">Back to stock</Link>.</td></tr>
             )}
           </tbody>
         </table>
@@ -66,3 +63,4 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     </>
   );
 }
+import { can } from "@/server/actor";

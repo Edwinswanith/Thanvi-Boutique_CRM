@@ -20,6 +20,7 @@ export const locationCreateSchema = z.object({
   code: upperCode(12).pipe(z.string().min(2, "Code must be at least 2 characters")),
   name: z.string().trim().min(2).max(80),
   type: z.enum(LOCATION_TYPES),
+  acceptsVendorStock: z.boolean().optional(),
   address: z.string().trim().max(300).default(""),
   city: z.string().trim().max(80).default(""),
   phone: z.string().trim().max(20).default(""),

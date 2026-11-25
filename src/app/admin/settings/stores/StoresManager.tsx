@@ -22,10 +22,10 @@ export function StoresManager({ initial, canCreate, canEdit }: Props) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function toggleActive(loc: LocationView) {
+  async function updateLocation(loc: LocationView, body: { active?: boolean; acceptsVendorStock?: boolean }) {
     setError(null);
     try {
-      const updated = await api<LocationView>(`/api/locations/${loc.id}`, { method: "PATCH", body: { active: !loc.active } });
+      const updated = await api<LocationView>(`/api/locations/${loc.id}`, { method: "PATCH", body });
       setLocations((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not update");
@@ -56,7 +56,9 @@ export function StoresManager({ initial, canCreate, canEdit }: Props) {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {list.map((loc) => (
-                <LocationCard key={loc.id} loc={loc} canEdit={canEdit} onToggle={() => toggleActive(loc)} />
+                <LocationCard key={loc.id} loc={loc} canEdit={canEdit}
+                  onToggle={() => updateLocation(loc, { active: !loc.active })}
+                  onReceiving={() => updateLocation(loc, { acceptsVendorStock: !loc.acceptsVendorStock })} />
               ))}
             </div>
           </section>
@@ -76,7 +78,7 @@ export function StoresManager({ initial, canCreate, canEdit }: Props) {
   );
 }
 
-function LocationCard({ loc, canEdit, onToggle }: { loc: LocationView; canEdit: boolean; onToggle: () => void }) {
+function LocationCard({ loc, canEdit, onToggle, onReceiving }: { loc: LocationView; canEdit: boolean; onToggle: () => void; onReceiving: () => void }) {
   return (
     <article className={`panel relative overflow-hidden p-5 ${loc.active ? "" : "opacity-60"}`}>
       <div className="zari absolute inset-x-0 top-0 h-1" aria-hidden />
@@ -100,6 +102,12 @@ function LocationCard({ loc, canEdit, onToggle }: { loc: LocationView; canEdit: 
           </div>
         )}
       </dl>
+      {loc.type === "godown" && (
+        <label className="mt-3 flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={loc.acceptsVendorStock} disabled={!canEdit} onChange={onReceiving} />
+          Receive vendor stock
+        </label>
+      )}
       {canEdit && (
         <button onClick={onToggle} className="mt-4 text-xs font-semibold text-ink-2 underline-offset-4 hover:underline">
           {loc.active ? "Deactivate" : "Reactivate"}

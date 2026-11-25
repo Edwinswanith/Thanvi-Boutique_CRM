@@ -1,6 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import { AppError } from "@/lib/api";
 import { itemCode } from "@/lib/code39";
+import { isOwnerAdmin } from "@/lib/rbac/permissions";
 import { toPaise } from "@/lib/money";
 import { receiveSchema } from "@/lib/validation/inventory";
 import { Item } from "@/models/Item";
@@ -14,6 +15,7 @@ import { writeAudit } from "./audit";
 import { assertBinAt } from "./bins";
 import { nextCode } from "./numberSeries";
 import { createBillForReceipt } from "./payables";
+import { acceptsVendorStock } from "./myLocations";
 
 export interface ReceiptResult {
   receiptRef: string;
@@ -23,17 +25,18 @@ export interface ReceiptResult {
 }
 
 /**
- * Goods receipt: one new SKU, N physical pieces with their own codes
- * (SKU-001 … SKU-N), placed in a location (and optionally a bin). All-or-nothing.
+ * Receive new pieces under a new or existing SKU in one transaction.
  */
 export async function receiveStock(actor: Actor, input: unknown): Promise<ReceiptResult> {
   const data = receiveSchema.parse(input);
   assertLocation(actor, data.locationId);
+  if (data.costPrice !== null && !actor.role.confidential) throw new AppError("Purchase cost requires confidential access", 403);
   const [location, vendor] = await Promise.all([
     Location.findOne({ _id: data.locationId, active: true }).lean(),
     Vendor.findOne({ _id: data.vendorId, active: true }).lean(),
   ]);
   if (!location || location.type === "online") throw new AppError("Stock can only be received at an active godown or store", 422);
+  if (!isOwnerAdmin(actor.role) && !acceptsVendorStock(location)) throw new AppError("Vendor deliveries go to a designated receiving godown", 403);
   if (!vendor) throw new AppError("Vendor not found", 404);
   await assertBinAt(data.binId, data.locationId);
 
@@ -52,34 +55,46 @@ export async function receiveStock(actor: Actor, input: unknown): Promise<Receip
 type ReceiveData = ReturnType<typeof receiveSchema.parse>;
 
 async function writeReceipt(actor: Actor, data: ReceiveData, session: mongoose.ClientSession): Promise<ReceiptResult> {
-  const sku = await nextCode("sku", session);
+  // The receipt counter serializes concurrent receipts before looking up piece codes.
   const receiptRef = await nextCode("receipt", session);
-  const [product] = await Product.create(
-    [
-      {
-        sku,
-        name: data.name,
-        category: data.category,
-        hsn: data.hsn,
-        mrp: toPaise(data.mrp),
-        costPrice: data.costPrice === null ? null : toPaise(data.costPrice),
-        vendorId: data.vendorId,
-        color: data.color,
-        fabric: data.fabric,
-        description: data.description,
-        photoIds: data.photoIds,
-        createdBy: actor.id,
-      },
-    ],
-    { session },
-  );
-  const codes = Array.from({ length: data.quantity }, (_, i) => itemCode(sku, i + 1));
+  const unitCost = data.costPrice === null ? null : toPaise(data.costPrice);
+  const restock = data.existingSku;
+  const product = restock !== undefined
+    ? await Product.findOne({ sku: restock }).session(session)
+    : (await Product.create([{
+      sku: await nextCode("sku", session),
+      name: data.name,
+      category: data.category,
+      hsn: data.hsn,
+      mrp: toPaise(data.mrp),
+      costPrice: unitCost,
+      vendorId: data.vendorId,
+      color: data.color,
+      fabric: data.fabric,
+      description: data.description,
+      photoIds: data.photoIds,
+      createdBy: actor.id,
+    }], { session }))[0];
+  if (!product) throw new AppError("SKU not found. Check the existing product's SKU.", 404);
+  const { sku } = product;
+  let lastPiece = 0;
+  if (restock) {
+    const prefix = `${sku}-`;
+    const codes = await Item.distinct("code", { productId: product._id }).session(session);
+    for (const code of codes) {
+      if (!code.startsWith(prefix)) continue;
+      const suffix = code.slice(prefix.length);
+      if (/^\d+$/.test(suffix)) lastPiece = Math.max(lastPiece, Number(suffix));
+    }
+  }
+  const codes = Array.from({ length: data.quantity }, (_, i) => itemCode(sku, lastPiece + i + 1));
   const items = await Item.insertMany(
     codes.map((code) => ({
       code,
       productId: product._id,
       sku,
       vendorId: new Types.ObjectId(data.vendorId),
+      purchaseCost: unitCost,
       locationId: new Types.ObjectId(data.locationId),
       binId: data.binId ? new Types.ObjectId(data.binId) : null,
       status: "available",
@@ -96,6 +111,7 @@ async function writeReceipt(actor: Actor, data: ReceiveData, session: mongoose.C
       toBinId: it.binId,
       toStatus: "available",
       reference: receiptRef,
+      note: restock ? data.description : "",
       actorId: actor.id,
       actorName: actor.name,
     })),
@@ -103,7 +119,7 @@ async function writeReceipt(actor: Actor, data: ReceiveData, session: mongoose.C
   );
   await createBillForReceipt(
     actor,
-    { vendorId: data.vendorId, locationId: data.locationId, receiptRef, productId: product._id, sku, description: data.name, quantity: codes.length, unitCost: product.costPrice ?? null },
+    { vendorId: data.vendorId, locationId: data.locationId, receiptRef, productId: product._id, sku, description: product.name, quantity: codes.length, unitCost },
     session,
   );
   await writeAudit(

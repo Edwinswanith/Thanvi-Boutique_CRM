@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Forbidden, PageHeader } from "@/components/admin/PageHeader";
 import { StatusBadge } from "@/components/admin/ui";
 import { formatINR } from "@/lib/money";
+import { can } from "@/server/actor";
 import type { InvoiceStatus } from "@/models/Invoice";
 import { pageActor } from "@/server/page";
 import { listInvoices } from "@/server/services/invoiceLifecycle";
@@ -21,7 +22,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader eyebrow="Billing · Records" title="Invoices" description={`${rows.length} invoice(s) shown · ${formatINR(total)} collected`} actions={<Link className="btn btn-gold" href="/admin/billing">New bill</Link>} />
+      <PageHeader title={actor.role.slug === "salesperson" ? "My invoices" : "Invoices"} description={`${rows.length} invoice(s) shown · ${formatINR(total)} collected`} actions={can(actor, "sales.create") && <Link className="btn btn-gold" href="/admin/billing">New bill</Link>} />
       <div className="rise mb-4 flex flex-wrap items-center gap-2">
         {FILTERS.map(([label, s]) => (
           <Link key={label} href={`/admin/billing/invoices${s ? `?status=${s}` : ""}`}

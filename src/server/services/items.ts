@@ -55,7 +55,7 @@ async function nameMaps(locationIds: unknown[], binIds: unknown[]) {
 /** What a scan shows: the piece, its product, and exactly where it is (location + bin). */
 export async function lookupItem(actor: Actor, rawCode: string): Promise<ItemView> {
   const code = rawCode.trim().toUpperCase();
-  const item = await Item.findOne({ code }).lean();
+  const item = await Item.findOne({ code }).select(actor.role.confidential ? "+purchaseCost" : "").lean();
   if (!item) throw new AppError(`No piece with code ${code}`, 404);
   const { locs, bins } = await nameMaps([item.locationId], item.binId ? [item.binId] : []);
   const loc = locs.get(String(item.locationId));
@@ -75,7 +75,7 @@ export async function lookupItem(actor: Actor, rawCode: string): Promise<ItemVie
     category: product?.category ?? "",
     hsn: product?.hsn ?? "",
     mrp: product?.mrp ?? 0,
-    costPrice: actor.role.confidential ? (product?.costPrice ?? null) : null,
+    costPrice: actor.role.confidential ? (item.purchaseCost === undefined ? product?.costPrice ?? null : item.purchaseCost) : null,
     color: product?.color ?? "",
     fabric: product?.fabric ?? "",
     photoIds: product?.photoIds ?? [],

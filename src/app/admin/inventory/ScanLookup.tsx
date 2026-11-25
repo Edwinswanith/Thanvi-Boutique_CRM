@@ -33,7 +33,7 @@ export function ScanLookup() {
 
 export function ItemCard({ item }: { item: ItemView }) {
   return (
-    <div className="grid gap-5 rounded-lg border border-line bg-paper p-5 sm:grid-cols-[120px_1fr_auto]">
+    <article aria-label="Piece details" className="grid gap-5 rounded-lg border border-line bg-paper p-5 sm:grid-cols-[120px_1fr_auto]">
       <div className="aspect-[3/4] w-full overflow-hidden rounded bg-gold-wash">
         {item.photoIds[0] ? (
           // eslint-disable-next-line @next/next/no-img-element -- authenticated GridFS photo, not optimisable by next/image
@@ -64,6 +64,6 @@ export function ItemCard({ item }: { item: ItemView }) {
           Full history →
         </Link>
       </div>
-    </div>
+    </article>
   );
 }

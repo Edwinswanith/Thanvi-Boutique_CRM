@@ -3,31 +3,45 @@
 import { useState } from "react";
 import { Notice } from "@/components/admin/ui";
 import { InvoiceDocument, type InvoiceData } from "@/components/invoice/InvoiceDocument";
+import { calculateInvoice, GstError, type LineInput, type TaxRuleInput } from "@/lib/gst/engine";
 import { GST_STATES } from "@/lib/gst/states";
 import { api } from "@/lib/http";
 import type { InvoiceSettingsView } from "@/server/services/taxSettings";
 
-const SAMPLE = (s: InvoiceSettingsView): InvoiceData => ({
-  number: "SH1-00042",
-  createdAt: new Date("2026-11-19T11:30:00+05:30"),
-  status: "closed",
-  supplyType: "intra",
-  placeOfSupply: s.stateCode,
-  customer: { name: "Priya Raman", phone: "98xxxxxx10" },
-  lines: [
-    { code: "TB1000-001", name: "Kanchipuram silk saree", hsn: "5007", mrp: 1_050_000, discount: 105_000, taxable: 900_000, rate: 5, cgst: 22_500, sgst: 22_500, total: 945_000 },
-    { code: "TB1012-004", name: "Cotton blouse (readymade)", hsn: "6206", mrp: 120_000, discount: 0, taxable: 114_286, rate: 5, cgst: 2_857, sgst: 2_857, total: 120_000 },
-  ],
-  totals: { mrp: 1_170_000, discount: 105_000, taxable: 1_014_286, cgst: 25_357, sgst: 25_357, igst: 0, roundOff: 0, grandTotal: 1_065_000 },
-  taxBreakup: [{ rate: 5, taxable: 1_014_286, cgst: 25_357, sgst: 25_357, igst: 0 }],
-  payments: [{ mode: "upi", amount: 1_065_000, reference: "UPI-2231" }],
-  salespersonName: "Lakshmi",
-  seller: { ...s, storeName: "Shop 1", storeCode: "SH1", storeAddress: s.address },
-});
+const sampleLines = [
+  { key: "TB1000-001", name: "Kanchipuram silk saree", hsn: "5007", mrp: 1_050_000, discount: { type: "percent", value: 10 } },
+  { key: "TB1012-004", name: "Cotton blouse (readymade)", hsn: "6206", mrp: 120_000 },
+] satisfies (LineInput & { name: string })[];
 
-export function InvoiceSettingsForm({ initial, editable }: { initial: InvoiceSettingsView; editable: boolean }) {
+function sampleInvoice(s: InvoiceSettingsView, rules: TaxRuleInput[]): InvoiceData {
+  const calc = calculateInvoice(sampleLines, rules, { pricesIncludeTax: s.pricesIncludeTax, roundToRupee: s.roundToRupee, supplyType: "intra" });
+  return {
+    number: "SH1-00042",
+    createdAt: new Date("2026-11-19T11:30:00+05:30"),
+    status: "closed",
+    supplyType: "intra",
+    placeOfSupply: s.stateCode,
+    customer: { name: "Priya Raman", phone: "98xxxxxx10" },
+    lines: calc.lines.map((line, index) => ({ ...line, code: line.key, name: sampleLines[index].name })),
+    totals: calc.totals,
+    taxBreakup: calc.taxBreakup,
+    payments: [{ mode: "upi", amount: calc.totals.grandTotal, reference: "UPI-2231" }],
+    salespersonName: "Lakshmi",
+    seller: { ...s, storeName: "Shop 1", storeCode: "SH1", storeAddress: s.address },
+  };
+}
+
+export function InvoiceSettingsForm({ initial, editable, rules }: { initial: InvoiceSettingsView; editable: boolean; rules: TaxRuleInput[] }) {
   const [s, setS] = useState(initial);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  let preview: InvoiceData | undefined;
+  let previewError = "";
+  try {
+    preview = sampleInvoice(s, rules);
+  } catch (error) {
+    if (!(error instanceof GstError)) throw error;
+    previewError = error.message;
+  }
   const set = <K extends keyof InvoiceSettingsView>(k: K, v: InvoiceSettingsView[K]) => setS((p) => ({ ...p, [k]: v }));
 
   async function save() {
@@ -88,7 +102,7 @@ export function InvoiceSettingsForm({ initial, editable }: { initial: InvoiceSet
         </div>
         <div className="overflow-x-auto rounded-lg border border-line bg-white p-2">
           <p className="code mb-2 px-2 text-[10px] tracking-[0.2em] text-gold">LIVE PREVIEW · SAMPLE DATA</p>
-          <InvoiceDocument invoice={SAMPLE(s)} />
+          {preview ? <InvoiceDocument invoice={preview} /> : <Notice kind="warn">{previewError}</Notice>}
         </div>
       </div>
     </section>

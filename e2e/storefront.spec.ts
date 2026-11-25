@@ -21,8 +21,10 @@ test("shopper browses silk, adds a saree to the bag and sees the subtotal", asyn
 
   await page.getByRole("button", { name: "BUY NOW" }).click();
   await expect(page).toHaveURL(/\/shop\/bag$/);
-  await expect(page.getByTestId("bag-subtotal")).toHaveText("₹6,900");
+  await expect(page.getByTestId("bag-subtotal")).toHaveText("₹3,450");
 
+  await page.getByRole("button", { name: "One more Pochampally Pattu Saree" }).click();
+  await expect(page.getByTestId("bag-subtotal")).toHaveText("₹6,900");
   await page.getByRole("button", { name: "One less Pochampally Pattu Saree" }).click();
   await expect(page.getByTestId("bag-subtotal")).toHaveText("₹3,450");
   await page.getByRole("button", { name: "Remove" }).click();
@@ -42,4 +44,26 @@ test("the shop is public and unknown sarees 404", async ({ page }) => {
   expect(res?.status()).toBe(404);
   await page.goto("/shop/bag");
   await expect(page).toHaveURL(/\/shop\/bag$/);
+});
+
+test("a delayed stock refresh keeps a removed product out of the bag", async ({ page }) => {
+  const slugs = ["pochampally-pattu-cadet-grey", "kota-cotton-forest-green"];
+  const response = await page.request.get(`/api/shop/products?slugs=${slugs.join(",")}`);
+  const { data } = await response.json();
+  const items = slugs.map((slug) => ({ ...data.find((item: { slug: string }) => item.slug === slug), qty: 1 }));
+  await page.addInitScript((lines) => localStorage.setItem("tb_bag_v2", JSON.stringify(lines)), items);
+
+  let release!: () => void;
+  const wait = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/shop/products?**", async (route) => {
+    await wait;
+    await route.fulfill({ json: { success: true, data: [items[0], { ...items[1], title: "Refreshed Kota saree" }] } });
+  });
+  await page.goto("/shop/bag");
+  const removed = page.getByRole("listitem").filter({ hasText: items[0].title });
+  await removed.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(removed).toHaveCount(0);
+  release();
+  await expect(page.getByText("Refreshed Kota saree", { exact: true })).toBeVisible();
+  await expect(removed).toHaveCount(0);
 });

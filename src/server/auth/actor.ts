@@ -12,6 +12,8 @@ import { SESSION_COOKIE, verifySession } from "./session";
 interface RoleLean {
   _id: Types.ObjectId;
   name: string;
+  slug: string;
+  builtIn: boolean;
   permissions: string[];
   isSystem: boolean;
   confidential: boolean;
@@ -32,6 +34,8 @@ export async function loadActor(userId: string): Promise<Actor | null> {
     role: {
       id: String(role._id),
       name: role.name,
+      slug: role.slug,
+      builtIn: role.builtIn,
       permissions: role.permissions,
       isSystem: role.isSystem,
       confidential: role.confidential,

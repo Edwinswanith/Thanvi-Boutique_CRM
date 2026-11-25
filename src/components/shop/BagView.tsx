@@ -3,13 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MAX_QTY, type CartLine } from "@/lib/storefront/cart";
+import { quantityLimit, type CartLine } from "@/lib/storefront/cart";
 import { formatPrice } from "@/lib/storefront/collections";
 import { useCart } from "./CartProvider";
 
 const EXIT_MS = 260;
 
-export function BagView() {
+export function BagView({ checkoutEnabled }: { checkoutEnabled: boolean }) {
   const { lines, subtotal, count, ready, update, remove, refresh } = useCart();
   const [leaving, setLeaving] = useState<string | null>(null);
   const [removedNotice, setRemovedNotice] = useState<string[]>([]);
@@ -56,13 +56,13 @@ export function BagView() {
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between"><dt>Items</dt><dd key={count} className="count-pop">{count}</dd></div>
           <div className="flex justify-between"><dt>Subtotal</dt><dd key={subtotal} data-testid="bag-subtotal" className="fade-in font-semibold">{formatPrice(subtotal)}</dd></div>
-          <div className="flex justify-between text-ink-soft"><dt>Shipping & GST</dt><dd>At checkout</dd></div>
         </dl>
         <div className="zari-rule my-5" />
-        <button type="button" disabled className="btn btn-gold w-full py-3.5 tracking-[0.14em]">CHECKOUT</button>
-        <p className="mt-3 text-xs leading-relaxed text-ink-soft">
-          Preview: checkout will take payment through Razorpay, and the order closes automatically once payment is confirmed.
-        </p>
+        {checkoutEnabled ? (
+          <Link href="/shop/checkout" className="btn btn-gold w-full py-3.5 tracking-[0.14em]">Checkout</Link>
+        ) : (
+          <button type="button" disabled className="btn btn-gold w-full py-3.5 tracking-[0.14em]">Checkout</button>
+        )}
         <p className="mt-4 text-xs text-ink-soft">Exchange only · no refunds</p>
       </aside>
     </div>
@@ -92,7 +92,7 @@ function BagLine({ line, leaving, onQty, onRemove }: BagLineProps) {
           <div className="flex items-center rounded-full border border-line-strong">
             <button type="button" onClick={() => (line.qty > 1 ? onQty(line.qty - 1) : onRemove())} className="h-8 w-8 rounded-full text-lg transition-colors hover:bg-ink/5 active:scale-90" aria-label={`One less ${line.title}`}>−</button>
             <span key={line.qty} className="count-pop w-6 text-center text-sm tabular-nums" aria-label="Quantity">{line.qty}</span>
-            <button type="button" onClick={() => onQty(line.qty + 1)} disabled={line.qty >= MAX_QTY} className="h-8 w-8 rounded-full text-lg transition-colors hover:bg-ink/5 active:scale-90 disabled:opacity-30" aria-label={`One more ${line.title}`}>+</button>
+            <button type="button" onClick={() => onQty(line.qty + 1)} disabled={line.qty >= quantityLimit(line)} className="h-8 w-8 rounded-full text-lg transition-colors hover:bg-ink/5 active:scale-90 disabled:opacity-30" aria-label={`One more ${line.title}`}>+</button>
           </div>
           <button type="button" onClick={onRemove} className="text-xs text-ink-soft underline underline-offset-4 transition-colors hover:text-madder">Remove</button>
         </div>

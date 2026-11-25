@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Forbidden, PageHeader } from "@/components/admin/PageHeader";
-import { SubNav } from "@/components/admin/ui";
+import { can } from "@/server/actor";
 import { pageActor } from "@/server/page";
 import { stockSummary } from "@/server/services/stock";
 import { ScanLookup } from "./ScanLookup";
-import { INVENTORY_TABS } from "./tabs";
 
 export const metadata: Metadata = { title: "Inventory" };
 
@@ -15,31 +14,49 @@ const COLUMNS = [
   ["in_transit", "Incoming"],
   ["sold", "Sold"],
   ["damaged", "Damaged"],
+  ["returned", "Returned"],
+  ["missing", "Missing"],
 ] as const;
 
-export default async function InventoryPage() {
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ location?: string }> }) {
   const { actor, allowed } = await pageActor("inventory.view");
   if (!allowed) return <Forbidden />;
-  const rows = await stockSummary(actor);
+  const [allRows, params] = await Promise.all([stockSummary(actor), searchParams]);
+  const selected = allRows.find((row) => row.locationId === params.location);
+  const rows = selected ? [selected] : allRows;
   const total = (k: (typeof COLUMNS)[number][0]) => rows.reduce((a, r) => a + r.counts[k], 0);
-  const unshelved = rows.reduce((a, r) => a + r.unshelved, 0);
 
   return (
     <>
-      <PageHeader eyebrow="Operations · Inventory" title="Stock & scan" description="Scan any tag to see the saree, where it sits (location and bin) and everything that has happened to it." />
-      <SubNav tabs={INVENTORY_TABS} />
+      <PageHeader title="Stock" description="Find a piece by barcode and check stock at your locations." />
 
       <section className="panel rise rise-1 mb-8 p-6">
         <p className="display mb-3 text-xl">Where is this piece?</p>
         <ScanLookup />
       </section>
 
-      <section className="rise rise-2 mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {allRows.length > 1 && (
+          <form action="/admin/inventory" className="flex items-center gap-2">
+            <select aria-label="Stock location" name="location" className="field" defaultValue={selected?.locationId ?? ""}>
+              <option value="">All assigned locations</option>
+              {allRows.map((row) => <option key={row.locationId} value={row.locationId}>{row.name}</option>)}
+            </select>
+            <button className="btn btn-ghost">Apply</button>
+          </form>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {can(actor, "products.view") && <Link className="btn btn-ghost" href="/admin/inventory/products">Stock by product</Link>}
+          {rows.some((row) => row.type !== "online") && <Link className="btn btn-ghost" href={selected ? `/admin/inventory/storage?location=${selected.locationId}` : "/admin/inventory/storage"}>Storage bins</Link>}
+        </div>
+      </div>
+
+      <section className="mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4">
         {[
           ["Available", total("available")],
+          ["On hand", total("available") + total("reserved") + total("damaged") + total("returned")],
           ["Incoming (in transit)", total("in_transit")],
           ["Sold", total("sold")],
-          ["Not yet shelved", unshelved],
         ].map(([label, value]) => (
           <div key={label} className="bg-card px-5 py-4">
             <p className="display text-3xl font-light">{value}</p>
@@ -47,6 +64,7 @@ export default async function InventoryPage() {
           </div>
         ))}
       </section>
+      {!rows.length && <p className="panel mb-4 px-5 py-4 text-sm text-ink-soft">Ask your administrator to assign a stock location.</p>}
 
       <section className="panel rise rise-3 overflow-x-auto">
         <table className="w-full text-sm">

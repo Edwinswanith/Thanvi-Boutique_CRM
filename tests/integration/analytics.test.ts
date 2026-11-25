@@ -25,7 +25,7 @@ async function twoStoresWithSales() {
   const arun = await actorWithRole("salesperson", { name: "Arun", locationIds: [sh2] });
   await createInvoice(priya, { locationId: sh1, lines: [{ code: a.codes[0] }, { code: a.codes[1] }], payment: { mode: "upi", reference: "U1" } });
   await createInvoice(arun, { locationId: sh2, lines: [{ code: b.codes[0] }], payment: { mode: "cash" } });
-  return { owner, sh1, sh2, priya, arun, a, b };
+  return { owner, sh1, sh2, priya, arun, a, b, vendor };
 }
 
 describe("sales overview", () => {
@@ -50,12 +50,17 @@ describe("sales overview", () => {
   });
 
   it("shows margin only to roles allowed to see cost, and only for sales with a known cost", async () => {
-    const { owner } = await twoStoresWithSales();
+    const { owner, sh1, priya, a, vendor } = await twoStoresWithSales();
     const o = await salesOverview(owner, { range: "30d" });
     const silkTaxable = o.kpis.netSales - Math.round(200_000 / 1.05);
     expect(o.margin!.amount).toBe(silkTaxable - 2 * 600_000);
     expect(o.margin!.coveredPct).toBeGreaterThan(80);
     expect(o.margin!.coveredPct).toBeLessThan(100);
+
+    const replenished = await receiveStock(owner, { vendorId: vendor.id, locationId: sh1, existingSku: a.sku, costPrice: 7_000, quantity: 1 });
+    await createInvoice(priya, { locationId: sh1, lines: [{ code: replenished.codes[0] }], payment: { mode: "cash" } });
+    const after = await salesOverview(owner, { range: "30d" });
+    expect(after.margin!.amount - o.margin!.amount).toBe(after.kpis.netSales - o.kpis.netSales - 700_000);
 
     const head = await actorWithRole("manager-head");
     expect((await salesOverview(head, { range: "30d" })).margin).toBeNull();

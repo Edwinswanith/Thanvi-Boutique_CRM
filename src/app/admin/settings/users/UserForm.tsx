@@ -5,7 +5,7 @@ import { Modal } from "@/components/admin/Modal";
 import { api } from "@/lib/http";
 import type { UserView } from "@/server/services/users";
 
-export interface RoleOption { id: string; name: string; allLocations: boolean; isSystem: boolean }
+export interface RoleOption { id: string; name: string; allLocations: boolean; assignable: boolean }
 export interface LocationOption { id: string; code: string; name: string }
 
 interface Props {
@@ -18,7 +18,8 @@ interface Props {
 }
 
 export function UserForm({ user, roles, locations, isSelf, onClose, onSaved }: Props) {
-  const [roleId, setRoleId] = useState(user?.roleId ?? roles.find((r) => r.name === "Salesperson")?.id ?? roles[0]?.id ?? "");
+  const availableRoles = roles.filter((r) => r.assignable || r.id === user?.roleId);
+  const [roleId, setRoleId] = useState(user?.roleId ?? availableRoles.find((r) => r.name === "Salesperson")?.id ?? availableRoles[0]?.id ?? "");
   const [locIds, setLocIds] = useState<Set<string>>(new Set(user?.locationIds ?? []));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -84,7 +85,7 @@ export function UserForm({ user, roles, locations, isSelf, onClose, onSaved }: P
         <div>
           <label className="label" htmlFor="u-role">Role</label>
           <select id="u-role" className="field" value={roleId} disabled={isSelf} onChange={(e) => setRoleId(e.target.value)}>
-            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            {availableRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           {isSelf && <p className="mt-1 text-xs text-ink-soft">You can&apos;t change your own role.</p>}
         </div>

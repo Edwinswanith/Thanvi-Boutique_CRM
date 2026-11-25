@@ -52,9 +52,11 @@ export function AddToBag({ item }: { item: CartItem }) {
   }, []);
 
   function buyNow() {
-    add(item, { openDrawer: false });
+    add(item, { openDrawer: false, onlyIfMissing: true });
     router.push("/shop/bag");
   }
+
+  if (item.availableQuantity === 0) return <p className="font-semibold">Sold out</p>;
 
   return (
     <>

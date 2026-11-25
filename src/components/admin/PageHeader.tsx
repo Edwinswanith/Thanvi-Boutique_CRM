@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 interface PageHeaderProps {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
@@ -11,7 +11,7 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
   return (
     <header className="rise mb-8 flex flex-wrap items-end justify-between gap-4">
       <div className="max-w-2xl">
-        <p className="code text-[11px] uppercase tracking-[0.28em] text-gold">{eyebrow}</p>
+        {eyebrow && <p className="code text-[11px] uppercase tracking-[0.28em] text-gold">{eyebrow}</p>}
         <h1 className="display mt-1 text-4xl font-light">{title}</h1>
         {description && <p className="mt-2 text-sm text-ink-soft">{description}</p>}
         <div className="zari-rule mt-4 w-28" />

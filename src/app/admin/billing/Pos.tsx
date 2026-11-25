@@ -16,12 +16,13 @@ type Mode = "cash" | "upi" | "card" | "razorpay";
 
 interface Props {
   stores: LocationOption[];
+  initialStoreId: string;
   pricesIncludeTax: boolean;
 }
 
-export function Pos({ stores, pricesIncludeTax }: Props) {
+export function Pos({ stores, initialStoreId, pricesIncludeTax }: Props) {
   const router = useRouter();
-  const [storeId, setStoreId] = useState(stores[0].id);
+  const [storeId, setStoreId] = useState(initialStoreId);
   const [channel, setChannel] = useState<"store" | "instagram" | "online">("store");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [billDisc, setBillDisc] = useState<Disc>(null);

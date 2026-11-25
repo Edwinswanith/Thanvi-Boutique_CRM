@@ -10,6 +10,9 @@ import type { TransferView } from "@/server/services/transfers";
 interface Props {
   mine: LocationOption[];
   all: LocationOption[];
+  initialMode?: "request" | "direct";
+  locationId?: string;
+  allowSend: boolean;
 }
 
 interface Line { sku: string; description: string; qty: number }
@@ -18,18 +21,23 @@ interface Line { sku: string; description: string; qty: number }
  * Two modes: a store REQUESTS stock from a godown (needs approval), or a
  * location SENDS stock directly (pick one destination, applies to all pieces).
  */
-export function NewTransfer({ mine, all }: Props) {
+export function NewTransfer({ mine, all, initialMode, locationId, allowSend }: Props) {
   const router = useRouter();
-  const [mode, setMode] = useState<"request" | "direct">(mine.some((l) => l.type === "store") ? "request" : "direct");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const allowRequest = mine.some((location) => location.type === "store") && all.some((location) => location.type === "godown");
+  const modes: ("request" | "direct")[] = [...(allowRequest ? ["request" as const] : []), ...(allowSend ? ["direct" as const] : [])];
+  const [mode, setMode] = useState<"request" | "direct">(initialMode && modes.includes(initialMode) ? initialMode : modes[0]);
+  const [from, setFrom] = useState(mode === "direct" ? locationId ?? "" : "");
+  const [to, setTo] = useState(mode === "request" ? locationId ?? (mine.length === 1 ? mine[0].id : "") : "");
   const [lines, setLines] = useState<Line[]>([{ sku: "", description: "", qty: 1 }]);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const fromOptions = mode === "request" ? all.filter((l) => l.type === "godown") : mine;
-  const toOptions = mode === "request" ? mine : all;
+  const sourceId = fromOptions.find((location) => location.id === from)?.id ?? fromOptions[0]?.id ?? "";
+  const destinations = mode === "request" ? mine.filter((location) => location.type === "store") : all;
+  const toOptions = destinations.filter((location) => location.id !== sourceId);
+  const destinationId = toOptions.find((location) => location.id === to)?.id ?? "";
   const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
   async function submit() {
@@ -39,8 +47,8 @@ export function NewTransfer({ mine, all }: Props) {
       const t = await api<TransferView>("/api/transfers", {
         method: "POST",
         body: {
-          fromLocationId: from || fromOptions[0]?.id,
-          toLocationId: to || toOptions.find((l) => l.id !== (from || fromOptions[0]?.id))?.id,
+          fromLocationId: sourceId,
+          toLocationId: destinationId,
           note,
           direct: mode === "direct",
           lines: lines.filter((l) => l.sku || l.description).map((l) => ({ ...l, qty: Number(l.qty) || 1 })),
@@ -56,7 +64,7 @@ export function NewTransfer({ mine, all }: Props) {
   return (
     <section className="panel rise rise-1 p-6">
       <div className="mb-5 inline-flex rounded-md border border-line-strong p-0.5" role="tablist">
-        {(["request", "direct"] as const).map((m) => (
+        {modes.map((m) => (
           <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
             className={`rounded px-4 py-1.5 text-sm font-semibold ${mode === m ? "bg-ink text-paper" : "text-ink-soft"}`}>
             {m === "request" ? "Request stock" : "Send stock directly"}
@@ -66,13 +74,14 @@ export function NewTransfer({ mine, all }: Props) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="t-from">{mode === "request" ? "Request from (godown)" : "Send from"}</label>
-          <select id="t-from" className="field" value={from} onChange={(e) => setFrom(e.target.value)}>
+          <select id="t-from" className="field" value={sourceId} onChange={(e) => setFrom(e.target.value)}>
             {fromOptions.map((l) => <option key={l.id} value={l.id}>{l.code} · {l.name}</option>)}
           </select>
         </div>
         <div>
           <label className="label" htmlFor="t-to">{mode === "request" ? "Deliver to (your store)" : "Destination — applies to all pieces"}</label>
-          <select id="t-to" className="field" value={to} onChange={(e) => setTo(e.target.value)}>
+          <select id="t-to" className="field" value={destinationId} onChange={(e) => setTo(e.target.value)}>
+            <option value="" disabled>Select destination</option>
             {toOptions.map((l) => <option key={l.id} value={l.id}>{l.code} · {l.name}</option>)}
           </select>
         </div>
@@ -81,7 +90,7 @@ export function NewTransfer({ mine, all }: Props) {
         <div className="mt-5 space-y-2">
           <p className="label">What do you need?</p>
           {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-[110px_1fr_80px_auto] gap-2">
+            <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[110px_1fr_80px_auto]">
               <input aria-label="SKU" className="field code uppercase" placeholder="SKU" value={l.sku} onChange={(e) => setLine(i, { sku: e.target.value.toUpperCase() })} />
               <input aria-label="Description" className="field" placeholder="e.g. red silk sarees, wedding range" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
               <input aria-label="Quantity" className="field code" type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} />
@@ -97,7 +106,7 @@ export function NewTransfer({ mine, all }: Props) {
       </div>
       {error && <div className="mt-4"><Notice kind="err">{error}</Notice></div>}
       <div className="mt-5 flex justify-end">
-        <button className="btn btn-gold" disabled={busy || !fromOptions.length || !toOptions.length} onClick={submit}>
+        <button className="btn btn-gold" disabled={busy || !sourceId || !destinationId} onClick={submit}>
           {busy ? "Saving…" : mode === "request" ? "Send request" : "Create & scan pieces"}
         </button>
       </div>

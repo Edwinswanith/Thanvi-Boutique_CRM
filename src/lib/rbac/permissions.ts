@@ -1,7 +1,7 @@
 export const ACTIONS = ["view", "create", "edit", "delete", "approve", "export"] as const;
 export type Action = (typeof ACTIONS)[number];
 
-/** System modules: configuration only. The only modules a Super Admin may hold. */
+/** Configuration modules for Owner / Admin and delegated Setup Admin. */
 export const SYSTEM_MODULES = {
   "system.roles": "Roles & permissions",
   "system.users": "Users",
@@ -9,13 +9,14 @@ export const SYSTEM_MODULES = {
   "system.numbering": "SKU & numbering",
 } as const;
 
-/** Data modules: business data. Never granted to a system (Super Admin) role. */
+/** Business modules. Setup-only roles cannot use these. */
 export const DATA_MODULES = {
   dashboard: "Dashboard & metrics",
   vendors: "Vendors",
   payables: "Vendor bills & payments",
   products: "Products & SKUs",
   inventory: "Inventory",
+  counts: "Stock counts & adjustments",
   transfers: "Stock requests & transfers",
   sales: "Billing & invoices",
   orders: "Online & Instagram orders",
@@ -62,22 +63,26 @@ export function permissionsFor(modules: readonly Module[], actions: readonly Act
 }
 
 export interface RoleLike {
+  readonly slug?: string;
+  readonly builtIn?: boolean;
   readonly permissions: readonly string[];
   readonly isSystem: boolean;
   readonly confidential: boolean;
   readonly allLocations: boolean;
 }
 
-/**
- * Central permission check. A system (Super Admin) role can never use a data
- * permission, even if one was stored on it — this keeps the Super Admin data-blind.
- */
+export function isOwnerAdmin(role: Pick<RoleLike, "slug" | "builtIn">): boolean {
+  return role.slug === "owner" && role.builtIn === true;
+}
+
 export function hasPermission(role: RoleLike | null | undefined, permission: Permission): boolean {
   if (!role) return false;
   const parts = splitPermission(permission);
   if (!parts) return false;
+  if (role.slug === "vendor") return false;
   if (role.isSystem && !isSystemModule(parts.module)) return false;
-  if (!role.isSystem && isSystemModule(parts.module)) return false;
+  if (!role.isSystem && isSystemModule(parts.module) && !isOwnerAdmin(role)) return false;
+  if (parts.module === "payables" && !role.confidential) return false;
   return role.permissions.includes(permission);
 }
 

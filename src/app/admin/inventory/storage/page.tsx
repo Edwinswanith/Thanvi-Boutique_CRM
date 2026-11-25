@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Forbidden, PageHeader } from "@/components/admin/PageHeader";
-import { SubNav } from "@/components/admin/ui";
 import { can } from "@/server/actor";
 import { pageActor } from "@/server/page";
 import { myLocations } from "@/server/services/myLocations";
-import { INVENTORY_TABS } from "../tabs";
 import { StorageManager } from "./StorageManager";
 
 export const metadata: Metadata = { title: "Storage bins" };
@@ -17,7 +15,6 @@ export default async function StoragePage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader eyebrow="Inventory · Storage" title="Storage bins" description="Map each godown and store into racks and shelves. Every piece is put into a bin, so a scan says exactly where to walk." />
-      <SubNav tabs={INVENTORY_TABS} />
       <StorageManager locations={locations} initialLocationId={locations.some((l) => l.id === wanted) ? wanted! : (locations[0]?.id ?? "")} canEdit={can(actor, "inventory.create")} />
     </>
   );

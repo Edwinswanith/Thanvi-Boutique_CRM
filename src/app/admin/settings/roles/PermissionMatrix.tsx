@@ -4,13 +4,14 @@ import { ACTIONS, DATA_MODULES, SYSTEM_MODULES, type Action } from "@/lib/rbac/p
 
 interface Props {
   isSystem: boolean;
+  includeSetup: boolean;
   value: ReadonlySet<string>;
   disabled: boolean;
   onChange: (next: Set<string>) => void;
 }
 
-export function PermissionMatrix({ isSystem, value, disabled, onChange }: Props) {
-  const modules = Object.entries(isSystem ? SYSTEM_MODULES : DATA_MODULES);
+export function PermissionMatrix({ isSystem, includeSetup, value, disabled, onChange }: Props) {
+  const modules = Object.entries(includeSetup ? { ...DATA_MODULES, ...SYSTEM_MODULES } : isSystem ? SYSTEM_MODULES : DATA_MODULES);
 
   const toggle = (perm: string) => {
     const next = new Set(value);

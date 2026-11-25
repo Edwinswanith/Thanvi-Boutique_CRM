@@ -92,6 +92,17 @@ describe("billing", () => {
     await expect(createInvoice(otherStore, { locationId: sh1Id, lines: [{ code: silk.codes[0] }], payment: { mode: "cash" } })).rejects.toThrow("access");
     await expect(createInvoice(owner, { locationId: sh1Id, lines: [{ code: silk.codes[0] }, { code: silk.codes[0] }], payment: { mode: "cash" } })).rejects.toThrow("twice");
   });
+
+  it("gives a salesperson their own invoices while a manager sees the shop's invoices", async () => {
+    const { sh1Id, silk, sales } = await storeWithStock();
+    const another = await actorWithRole("salesperson", { locationIds: [sh1Id] });
+    const manager = await actorWithRole("manager", { locationIds: [sh1Id] });
+    const bill = await createInvoice(sales, { locationId: sh1Id, lines: [{ code: silk.codes[0] }], payment: { mode: "cash" } });
+    expect((await listInvoices(sales)).map((row) => row.id)).toEqual([bill.id]);
+    expect(await listInvoices(another)).toHaveLength(0);
+    await expect(getInvoice(another, bill.id)).rejects.toMatchObject({ status: 404 });
+    expect((await listInvoices(manager)).map((row) => row.id)).toEqual([bill.id]);
+  });
 });
 
 describe("GST settings", () => {

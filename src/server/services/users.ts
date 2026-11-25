@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { AppError } from "@/lib/api";
+import { isOwnerAdmin } from "@/lib/rbac/permissions";
 import { userCreateSchema, userUpdateSchema } from "@/lib/validation/schemas";
 import { Location } from "@/models/Location";
 import { Role } from "@/models/Role";
@@ -60,9 +61,18 @@ async function assertRefsExist(roleId?: string, locationIds?: readonly string[])
   }
 }
 
+async function assertAssignableRole(actor: Actor, roleId: string) {
+  if (isOwnerAdmin(actor.role)) return;
+  const role = await Role.findById(roleId).select("slug builtIn isSystem confidential").lean();
+  if (role && (role.isSystem || role.confidential || isOwnerAdmin(role))) {
+    throw new AppError("Owner / Admin manages this account or role", 403);
+  }
+}
+
 export async function createUser(actor: Actor, input: unknown): Promise<UserView> {
   const { password, ...data } = userCreateSchema.parse(input);
   await assertRefsExist(data.roleId, data.locationIds);
+  await assertAssignableRole(actor, data.roleId);
   const doc = await User.create({ ...data, passwordHash: await hashPassword(password) });
   const view = await getUserView(String(doc._id));
   await writeAudit(actor, { action: "user.create", entity: "user", entityId: view.id, after: view });
@@ -76,9 +86,12 @@ export async function updateUser(actor: Actor, id: string, input: unknown): Prom
   if (isSelf && data.roleId && data.roleId !== before.roleId) throw new AppError("You cannot change your own role", 403);
   if (isSelf && data.active === false) throw new AppError("You cannot deactivate your own account", 403);
   await assertRefsExist(data.roleId, data.locationIds);
+  if (!isSelf) await assertAssignableRole(actor, before.roleId);
+  if (data.roleId && data.roleId !== before.roleId) await assertAssignableRole(actor, data.roleId);
 
   const patch = password ? { ...data, passwordHash: await hashPassword(password) } : data;
-  await User.updateOne({ _id: id }, { $set: patch });
+  const result = await User.updateOne({ _id: id, roleId: before.roleId }, { $set: patch });
+  if (!result.matchedCount) throw new AppError("The account changed. Reload and try again.", 409);
   const after = await getUserView(id);
   await writeAudit(actor, {
     action: password ? "user.update+password" : "user.update",

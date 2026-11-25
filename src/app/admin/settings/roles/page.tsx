@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Forbidden, PageHeader } from "@/components/admin/PageHeader";
+import { isOwnerAdmin } from "@/lib/rbac/permissions";
 import { can } from "@/server/actor";
 import { pageActor } from "@/server/page";
 import { listRoles } from "@/server/services/roles";
@@ -14,13 +16,14 @@ export default async function RolesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Setup · Access"
         title="Roles & permissions"
-        description="Each role is a grid of modules and actions. The Super Admin role is locked to setup only, so it never sees sales, stock or costs."
+        description="Set which actions each role can perform."
+        actions={can(actor, "system.users.view") && <Link href="/admin/settings/users" className="btn btn-ghost">Back to users</Link>}
       />
       <RolesManager
         initial={roles}
         currentRoleId={actor.role.id}
+        canGrantConfidential={isOwnerAdmin(actor.role)}
         perms={{
           create: can(actor, "system.roles.create"),
           edit: can(actor, "system.roles.edit"),

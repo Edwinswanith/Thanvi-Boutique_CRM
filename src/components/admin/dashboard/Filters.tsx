@@ -12,7 +12,7 @@ interface FiltersProps {
 
 function href(range: RangeKey, locationId: string | null): string {
   const qs = new URLSearchParams({ range, ...(locationId ? { store: locationId } : {}) });
-  return `/admin?${qs.toString()}`;
+  return `/admin/reports?${qs.toString()}`;
 }
 
 /** One row of filters above every chart: period, then store. State lives in the URL so it can be shared. */

@@ -27,9 +27,9 @@ const RW: Action[] = ["view", "create", "edit"];
 
 export const DEFAULT_ROLES: readonly RoleSeed[] = [
   {
-    name: "Super Admin",
+    name: "Setup Admin",
     slug: "super-admin",
-    description: "Sets up stores, users, roles and numbering. Cannot see business data.",
+    description: "Manages locations, accounts, delegated roles and numbering.",
     permissions: permissionsFor(allSystem, ACTIONS),
     isSystem: true,
     confidential: false,
@@ -37,10 +37,10 @@ export const DEFAULT_ROLES: readonly RoleSeed[] = [
     builtIn: true,
   },
   {
-    name: "Owner",
+    name: "Owner / Admin",
     slug: "owner",
-    description: "Business owner. Full access to all data, costs, margins and metrics.",
-    permissions: permissionsFor(allData, ACTIONS),
+    description: "Manages all locations, business operations, confidential data and settings.",
+    permissions: [...permissionsFor(allData, ACTIONS), ...permissionsFor(allSystem, ACTIONS)],
     isSystem: false,
     confidential: true,
     allLocations: true,
@@ -52,10 +52,8 @@ export const DEFAULT_ROLES: readonly RoleSeed[] = [
     description: "Oversees all stores: stock, sales, staff and approvals.",
     permissions: [
       ...permissionsFor(["dashboard", "reports", "audit"], ["view", "export"]),
-      ...permissionsFor(["taxes"], ["view"]),
-      ...permissionsFor(["inventory", "transfers", "sales", "orders", "offers", "customers", "staff", "incentives"], [...RW, "approve", "export"]),
-      ...permissionsFor(["vendors", "products"], ["view"]),
-      ...permissionsFor(["catalog"], [...RW, "approve"]),
+      ...permissionsFor(["inventory", "counts", "transfers", "sales", "orders", "offers", "customers", "staff", "incentives"], [...RW, "approve", "export"]),
+      ...permissionsFor(["products"], ["view"]),
     ],
     isSystem: false,
     confidential: false,
@@ -63,12 +61,12 @@ export const DEFAULT_ROLES: readonly RoleSeed[] = [
     builtIn: true,
   },
   {
-    name: "Manager",
+    name: "Shop Manager",
     slug: "manager",
     description: "Runs one store: inventory, stock requests, staff, attendance and incentives.",
     permissions: [
       ...permissionsFor(["dashboard", "reports"], ["view"]),
-      ...permissionsFor(["inventory", "transfers", "sales", "orders", "customers", "staff", "incentives"], [...RW, "approve"]),
+      ...permissionsFor(["inventory", "counts", "transfers", "sales", "orders", "customers", "staff", "incentives"], [...RW, "approve"]),
       ...permissionsFor(["products", "offers"], ["view"]),
     ],
     isSystem: false,
@@ -94,8 +92,8 @@ export const DEFAULT_ROLES: readonly RoleSeed[] = [
     slug: "godown-staff",
     description: "Receives vendor stock, prints labels, dispatches and receives transfers.",
     permissions: [
-      ...permissionsFor(["inventory", "transfers", "products"], RW),
-      ...permissionsFor(["vendors"], ["view", "create"]),
+      ...permissionsFor(["inventory", "counts", "transfers", "products"], RW),
+      ...permissionsFor(["vendors"], ["create"]),
     ],
     isSystem: false,
     confidential: false,
@@ -119,7 +117,7 @@ export const DEFAULT_ROLES: readonly RoleSeed[] = [
     name: "Vendor",
     slug: "vendor",
     description: "Vendor portal: own purchase orders and deliveries only.",
-    permissions: permissionsFor(["vendors"], ["view"]),
+    permissions: [],
     isSystem: false,
     confidential: false,
     allLocations: false,
@@ -131,10 +129,11 @@ export interface LocationSeed {
   code: string;
   name: string;
   type: LocationType;
+  acceptsVendorStock?: boolean;
 }
 
 export const DEFAULT_LOCATIONS: readonly LocationSeed[] = [
-  { code: "GD1", name: "Godown 1", type: "godown" },
+  { code: "GD1", name: "Godown 1", type: "godown", acceptsVendorStock: true },
   { code: "GD2", name: "Godown 2", type: "godown" },
   { code: "SH1", name: "Shop 1", type: "store" },
   { code: "SH2", name: "Shop 2", type: "store" },
@@ -150,4 +149,5 @@ export const DEFAULT_SERIES = [
   { key: "order", label: "Online / Instagram order", prefix: "ORD-", next: 1, padding: 6 },
   { key: "receipt", label: "Goods receipt (GRN)", prefix: "GRN-", next: 1, padding: 5 },
   { key: "vendorBill", label: "Vendor bill", prefix: "VB-", next: 1, padding: 5 },
+  { key: "stockCount", label: "Stock count", prefix: "SC-", next: 1, padding: 5 },
 ] as const;

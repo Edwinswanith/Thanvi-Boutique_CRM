@@ -23,7 +23,7 @@ export function ProductCard({ product, priority }: ProductCardProps) {
   const imageAlt = [product.title, product.colour, fabric && `${fabric} saree`].filter(Boolean).join(", ");
 
   function quickAdd() {
-    add({ slug: product.slug, title: product.title, price: product.price, image: cover ?? "", colour: product.colour, collection: fabric });
+    add({ slug: product.slug, title: product.title, price: product.price, availableQuantity: product.availableQuantity, image: cover ?? "", colour: product.colour, collection: fabric });
     setJustAdded(true);
     window.setTimeout(() => setJustAdded(false), 1600);
   }
@@ -44,7 +44,7 @@ export function ProductCard({ product, priority }: ProductCardProps) {
           )}
         </Link>
         {product.featured && <span className="pointer-events-none absolute top-2.5 left-2.5 rounded-full bg-paper/90 px-2.5 py-1 text-[9px] font-bold tracking-[0.18em] text-ink backdrop-blur">FEATURED</span>}
-        <button type="button" onClick={quickAdd} disabled={!ready} aria-label={`Add ${product.title} to bag`}
+        {product.availableQuantity > 0 && <button type="button" onClick={quickAdd} disabled={!ready} aria-label={`Add ${product.title} to bag`}
           className={`absolute right-2.5 bottom-2.5 flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[11px] font-bold tracking-[0.14em] shadow-lg transition-all duration-300 sm:translate-y-2 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 sm:focus-visible:translate-y-0 sm:focus-visible:opacity-100 ${justAdded ? "bg-leaf text-white" : "bg-ink text-paper hover:bg-gold-bright hover:text-ink"}`}>
           {justAdded ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden><path className="draw-check" d="M5 13l4 4L19 7" /></svg>
@@ -52,12 +52,13 @@ export function ProductCard({ product, priority }: ProductCardProps) {
             <span className="text-base leading-none" aria-hidden>+</span>
           )}
           <span className="hidden sm:inline">{justAdded ? "ADDED" : "ADD"}</span>
-        </button>
+        </button>}
       </div>
       <Link href={href} className="mt-3 block space-y-0.5">
         {label && <p className="text-[10px] font-semibold tracking-[0.22em] text-gold uppercase">{label}</p>}
         <p className="text-[15px] leading-snug text-ink"><span className="link-grow">{product.title}</span></p>
         <p className="text-[15px] font-semibold">{formatPrice(product.price)}</p>
+        {product.availableQuantity === 0 && <p className="text-sm text-ink-soft">Sold out</p>}
       </Link>
     </div>
   );

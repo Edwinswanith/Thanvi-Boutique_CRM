@@ -1,26 +1,30 @@
 import type { Metadata } from "next";
 import { Forbidden, PageHeader } from "@/components/admin/PageHeader";
-import { SubNav } from "@/components/admin/ui";
+import { isOwnerAdmin } from "@/lib/rbac/permissions";
 import { can } from "@/server/actor";
 import { pageActor } from "@/server/page";
 import { myLocations } from "@/server/services/myLocations";
 import { listVendors } from "@/server/services/vendors";
-import { INVENTORY_TABS } from "../tabs";
 import { ReceiveForm } from "./ReceiveForm";
 
 export const metadata: Metadata = { title: "Receive stock" };
 
-export default async function ReceivePage() {
+export default async function ReceivePage({ searchParams }: { searchParams: Promise<{ location?: string }> }) {
   const { actor, allowed } = await pageActor("inventory.create");
   if (!allowed) return <Forbidden />;
-  const [vendors, locations] = await Promise.all([listVendors(), myLocations(actor, ["godown", "store"])]);
+  const [assigned, params] = await Promise.all([myLocations(actor, ["godown", "store"]), searchParams]);
+  const locations = assigned.filter((location) => location.acceptsVendorStock || isOwnerAdmin(actor.role))
+    .sort((a, b) => Number(b.acceptsVendorStock) - Number(a.acceptsVendorStock));
+  if (!locations.length) return <Forbidden />;
+  const preferred = locations.find((location) => location.id === params.location)?.id ?? locations[0].id;
+  const vendors = await listVendors();
   return (
     <>
-      <PageHeader eyebrow="Inventory · Goods receipt" title="Receive stock" description="Photograph the saree, enter its details once, and every piece gets its own barcode. Put them straight onto a shelf so a scan always finds them." />
-      <SubNav tabs={INVENTORY_TABS} />
+      <PageHeader title="Receive stock" description="Verify a vendor delivery, select or create a SKU, then print one label per piece." />
       <ReceiveForm
         vendors={vendors.filter((v) => v.active).map((v) => ({ id: v.id, code: v.code, name: v.name }))}
         locations={locations}
+        initialLocationId={preferred}
         canAddVendor={can(actor, "vendors.create")}
         showCost={actor.role.confidential}
       />

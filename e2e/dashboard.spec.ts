@@ -12,6 +12,7 @@ async function signIn(page: Page, who: keyof typeof E2E_USERS) {
 test("owner sees sales, store ranking and next week's forecast, and can filter", async ({ page }) => {
   await signIn(page, "owner");
   await expect(page.getByText("Business overview")).toBeVisible();
+  await page.getByRole("navigation", { name: "CRM navigation" }).getByRole("link", { name: "Reports" }).click();
   await expect(page.getByTestId("kpi-revenue")).toContainText("₹");
   await expect(page.getByTestId("forecast-total")).toContainText("₹");
   await expect(page.getByRole("heading", { name: "Which store is doing best" })).toBeVisible();
@@ -26,7 +27,7 @@ test("owner sees sales, store ranking and next week's forecast, and can filter",
 
   await page.getByLabel("Store").selectOption({ label: "Shop 2" });
   await expect(page).toHaveURL(/store=/);
-  await expect(page.getByText("Shop 2. Sales, best performers")).toBeVisible();
+  await expect(page.getByText("Shop 2", { exact: true }).first()).toBeVisible();
 });
 
 test("super admin gets the setup desk and no business figures", async ({ page }) => {

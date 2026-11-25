@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Notice, StatusBadge } from "@/components/admin/ui";
 import { GST_RATES } from "@/lib/gst/rates";
 import { api } from "@/lib/http";
@@ -37,6 +38,7 @@ const describe = (r: TaxRuleView) =>
   r.slabs.map((s) => (s.upTo === null ? `${r.slabs.length > 1 ? "above: " : ""}${s.rate}%` : `≤ ₹${(s.upTo / 100).toLocaleString("en-IN")}: ${s.rate}%`)).join(" · ");
 
 export function TaxRulesEditor({ initial, editable, canCreate }: Props) {
+  const router = useRouter();
   const [rules, setRules] = useState(initial);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function TaxRulesEditor({ initial, editable, canCreate }: Props) {
       const saved = await api<TaxRuleView>(draft.id ? `/api/tax-rules/${draft.id}` : "/api/tax-rules", { method: draft.id ? "PATCH" : "POST", body });
       setRules((prev) => (draft.id ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
       setDraft(null);
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
     }

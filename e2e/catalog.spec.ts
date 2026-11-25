@@ -3,15 +3,15 @@ import { E2E_USERS } from "./users";
 
 async function signIn(page: Page) {
   await page.goto("/admin");
-  await page.getByLabel("Email").fill(E2E_USERS.owner.email);
-  await page.getByLabel("Password").fill(E2E_USERS.owner.password);
+  await page.getByLabel("Email").fill(E2E_USERS.editor.email);
+  await page.getByLabel("Password").fill(E2E_USERS.editor.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/admin$/, { timeout: 45_000 });
 }
 
 test("content editor updates copy live, unpublishes and republishes a saree", async ({ page }) => {
   await signIn(page);
-  await page.getByRole("link", { name: "Online catalog" }).first().click();
+  await page.getByRole("navigation", { name: "CRM navigation" }).getByRole("link", { name: "Catalog", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Online catalog" })).toBeVisible();
   await page.getByRole("link", { name: /Raga Silk Saree/ }).first().click();
   await expect(page.getByText("Live on website")).toBeVisible();
@@ -44,4 +44,7 @@ test("publishing is blocked until the checklist is complete", async ({ page }) =
   await page.getByLabel("Full description").fill("Too short");
   await expect(page.getByRole("button", { name: "Save & publish" })).toBeDisabled();
   await expect(page.getByText("Finish the items marked ! to publish.")).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("Published. It's now live on the website.")).toBeVisible();
 });

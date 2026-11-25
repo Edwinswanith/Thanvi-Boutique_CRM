@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { hasPermission } from "@/lib/rbac/permissions";
 import { Product } from "@/models/Product";
+import { Item } from "@/models/Item";
+import { Location } from "@/models/Location";
 import { Vendor } from "@/models/Vendor";
 import { getListingEditor, listCatalog, saveListing, setPublished } from "@/server/services/catalog";
 import { savePhoto } from "@/server/services/files";
+import { createTransfer, dispatchTransfer, receiveTransfer } from "@/server/services/transfers";
 import { getPublishedBySlug, isPublishedPhoto, listPublished, liveCollections, publishedBySlugs, relatedPublished } from "@/server/services/storefront";
 import { actorWithRole, setupTestDb } from "../setup/db";
 
@@ -148,7 +151,26 @@ describe("storefront helpers", () => {
 
     expect(await liveCollections()).toEqual([{ key: "silk", cover: `/api/media/${pic}` }]);
     const fresh = await publishedBySlugs(["silk-live", "cotton-draft", "BAD SLUG", "silk-live"]);
-    expect(fresh).toEqual([{ slug: "silk-live", title: "Silk Live", price: 200_000, image: `/api/media/${pic}`, colour: "Warm Blue", collection: "Silk" }]);
+    expect(fresh).toEqual([{ slug: "silk-live", title: "Silk Live", price: 200_000, availableQuantity: 0, image: `/api/media/${pic}`, colour: "Warm Blue", collection: "Silk" }]);
+    const [productRow, web, godown] = await Promise.all([
+      Product.findById(live).orFail(),
+      Location.findOne({ code: "WEB" }).orFail(),
+      Location.findOne({ code: "GD1" }).orFail(),
+    ]);
+    const piece = { productId: live, sku: productRow.sku, vendorId: productRow.vendorId };
+    await Item.create([
+      { ...piece, code: "QA-001", locationId: web.id, status: "available" },
+      { ...piece, code: "QA-002", locationId: web.id, status: "in_transit" },
+      { ...piece, code: "QA-003", locationId: godown.id, status: "available" },
+    ]);
+    expect(await getPublishedBySlug("silk-live")).toMatchObject({ availableQuantity: 1 });
+    expect(await publishedBySlugs(["silk-live"])).toEqual([{ ...fresh[0], availableQuantity: 1 }]);
+    const owner = await actorWithRole("owner");
+    const transfer = await createTransfer(owner, { fromLocationId: godown.id, toLocationId: web.id, direct: true });
+    await dispatchTransfer(owner, transfer.id, { codes: ["QA-003"] });
+    expect(await getPublishedBySlug("silk-live")).toMatchObject({ availableQuantity: 1 });
+    await receiveTransfer(owner, transfer.id, { codes: ["QA-003"] });
+    expect(await getPublishedBySlug("silk-live")).toMatchObject({ availableQuantity: 2 });
     expect(await publishedBySlugs([])).toEqual([]);
     expect(await getPublishedBySlug("../etc")).toBeNull();
     expect(await isPublishedPhoto("not-an-id")).toBe(false);

@@ -3,7 +3,6 @@ import { AppError } from "@/lib/api";
 import { Invoice, type InvoiceStatus } from "@/models/Invoice";
 import { Location } from "@/models/Location";
 import type { Actor } from "@/server/actor";
-import { canAccessLocation } from "@/server/actor";
 import type { PaidEvent } from "@/server/payments/razorpay";
 import { locationFilter, oid } from "@/server/scope";
 import { writeAudit } from "./audit";
@@ -31,8 +30,12 @@ export interface InvoiceRow {
   modes: string[];
 }
 
+function invoiceScope(actor: Actor) {
+  return { ...locationFilter(actor), ...(actor.role.slug === "salesperson" ? { salespersonId: actor.id } : {}) };
+}
+
 export async function listInvoices(actor: Actor, opts: { status?: InvoiceStatus; q?: string } = {}): Promise<InvoiceRow[]> {
-  const filter: Record<string, unknown> = { ...locationFilter(actor) };
+  const filter: Record<string, unknown> = invoiceScope(actor);
   if (opts.status) filter.status = opts.status;
   if (opts.q?.trim()) filter.$or = [{ number: opts.q.trim().toUpperCase() }, { "customer.phone": opts.q.trim() }];
   const docs = await Invoice.find(filter).sort({ createdAt: -1 }).limit(300).lean();
@@ -52,8 +55,8 @@ export async function listInvoices(actor: Actor, opts: { status?: InvoiceStatus;
 }
 
 export async function getInvoice(actor: Actor, id: string) {
-  const doc = await Invoice.findById(oid(id, "invoice")).lean();
-  if (!doc || !canAccessLocation(actor, String(doc.locationId))) throw new AppError("Invoice not found", 404);
+  const doc = await Invoice.findOne({ _id: oid(id, "invoice"), ...invoiceScope(actor) }).lean();
+  if (!doc) throw new AppError("Invoice not found", 404);
   return { ...doc, id: String(doc._id) };
 }
 

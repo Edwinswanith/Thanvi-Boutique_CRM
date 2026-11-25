@@ -197,6 +197,19 @@ export function Dashboard({ o, payables }: { o: Overview; payables?: PayablesSum
 
       {payables && <VendorDuesCard p={payables} />}
 
+      {o.websiteOrders && (
+        <Card title="Website orders" hint={period}>
+          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div><dt>Paid website invoices</dt><dd className="code">{o.websiteOrders.invoiced.count} · {formatINR(o.websiteOrders.invoiced.amount)}</dd></div>
+            <div><dt>Dummy payments recorded</dt><dd className="code">{o.websiteOrders.dummy.count} · {formatINR(o.websiteOrders.dummy.amount)}</dd></div>
+            <div><dt>Test COD pending</dt><dd className="code">{o.websiteOrders.cod.count} · {formatINR(o.websiteOrders.cod.amount)}</dd></div>
+            <div><dt>Cancelled test orders</dt><dd className="code">{o.websiteOrders.cancelled}</dd></div>
+          </dl>
+          <p className="mt-4 text-sm text-ink-soft">Test amounts are excluded from sales revenue.</p>
+          <Link href="/admin/orders" className="btn btn-ghost mt-4">Open online orders</Link>
+        </Card>
+      )}
+
       <OpsStrip o={o} />
     </div>
   );

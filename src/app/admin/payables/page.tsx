@@ -34,7 +34,9 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader eyebrow="Business · Vendors" title="Vendor dues" description="Every delivery raises a bill automatically. Record payments here to see what is paid, pending and overdue." />
+      <PageHeader title="Vendor dues" description="Record payments and check what’s pending or overdue." actions={
+        can(actor, "vendors.view") && <Link href="/admin/inventory/vendors" className="btn btn-ghost">Vendor directory</Link>
+      } />
       {summary.hasDemo && <p role="status" className="rise mb-6 rounded-md border border-gold/40 bg-gold-wash px-4 py-2.5 text-sm"><strong>Sample data.</strong> Demo vendors and bills are included so you can try this screen. Remove them before going live.</p>}
 
       <section className="rise mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line lg:grid-cols-4">

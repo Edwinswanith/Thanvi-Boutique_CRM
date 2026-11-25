@@ -59,9 +59,11 @@ export async function listProducts(actor: Actor, q = ""): Promise<ProductRow[]> 
   const search = q.trim()
     ? { $or: [{ sku: q.trim().toUpperCase() }, { name: { $regex: escapeRegex(q.trim()), $options: "i" } }, { category: { $regex: escapeRegex(q.trim()), $options: "i" } }] }
     : {};
-  const products = await Product.find(search).select(actor.role.confidential ? "+costPrice" : "").sort({ createdAt: -1 }).limit(200).lean();
+  const scope = locationFilter(actor);
+  const allowed = actor.role.allLocations ? {} : { _id: { $in: await Item.distinct("productId", scope) } };
+  const products = await Product.find({ ...search, ...allowed }).select(actor.role.confidential ? "+costPrice" : "").sort({ createdAt: -1 }).limit(200).lean();
   const counts = await Item.aggregate<{ _id: { p: Types.ObjectId; s: ItemStatus }; n: number }>([
-    { $match: { ...locationFilter(actor), productId: { $in: products.map((p) => p._id) } } },
+    { $match: { ...scope, productId: { $in: products.map((p) => p._id) } } },
     { $group: { _id: { p: "$productId", s: "$status" }, n: { $sum: 1 } } },
   ]);
   return products.map((p) => {

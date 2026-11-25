@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { NAV, type NavSection } from "@/components/admin/nav";
+import { adminWorkspaces } from "@/components/admin/nav";
 import { Sidebar } from "@/components/admin/Sidebar";
-import { can } from "@/server/actor";
+import { WorkspaceNav } from "@/components/admin/WorkspaceNav";
 import { pageActor } from "@/server/page";
+import { myLocations } from "@/server/services/myLocations";
 
 export const dynamic = "force-dynamic";
 
@@ -11,16 +12,22 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { actor } = await pageActor();
-  const sections: NavSection[] = NAV.map((s) => ({
-    ...s,
-    items: s.items.filter((i) => !i.permission || can(actor, i.permission)),
-  })).filter((s) => s.items.length > 0);
+  const locations = actor.role.isSystem || actor.role.slug === "vendor" ? [] : await myLocations(actor);
+  const workspaces = adminWorkspaces(actor, locations);
+  const items = workspaces.map(({ label, tabs }) => ({
+    label,
+    href: tabs[0].href,
+    matches: tabs.flatMap((tab) => [tab.href, ...(tab.matches ?? [])]),
+  }));
 
   return (
     <div className="min-h-screen">
-      <Sidebar sections={sections} userName={actor.name} roleName={actor.role.name} />
-      <main className="px-5 pt-16 pb-16 lg:ml-64 lg:px-12 lg:pt-12">
-        <div className="mx-auto max-w-6xl">{children}</div>
+      <Sidebar items={items} userName={actor.name} roleName={actor.role.name} />
+      <main className="px-5 pt-16 pb-16 lg:ml-64 lg:px-12 lg:pt-8">
+        <div className="mx-auto max-w-6xl">
+          <WorkspaceNav workspaces={workspaces} />
+          {children}
+        </div>
       </main>
     </div>
   );

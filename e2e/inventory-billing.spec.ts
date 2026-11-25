@@ -50,13 +50,15 @@ test("receive → shelve → scan → transfer → bill → sold", async ({ page
   // 4. Scan: where is it?
   await page.goto("/admin/inventory");
   await scan(page, code);
-  await expect(page.getByText("Godown 1")).toBeVisible();
-  await expect(page.getByText("R1-S1", { exact: true })).toBeVisible();
+  const details = page.getByRole("article", { name: "Piece details" });
+  await expect(details.getByText("Godown 1", { exact: true })).toBeVisible();
+  await expect(details.getByText("R1-S1", { exact: true })).toBeVisible();
 
   // 5. Direct transfer GD1 → SH1, dispatch and receive by scanning
   await page.goto("/admin/transfers");
   await page.getByRole("tab", { name: "Send stock directly" }).click();
   await page.getByLabel("Send from").selectOption({ label: "GD1 · Godown 1" });
+  await expect(page.getByRole("button", { name: "Create & scan pieces" })).toBeDisabled();
   await page.getByLabel("Destination — applies to all pieces").selectOption({ label: "SH1 · Shop 1" });
   await page.getByRole("button", { name: "Create & scan pieces" }).click();
   await expect(page).toHaveURL(/\/admin\/transfers\/[a-f0-9]{24}/);
@@ -78,9 +80,41 @@ test("receive → shelve → scan → transfer → bill → sold", async ({ page
   await expect(page.getByText("TAX INVOICE")).toBeVisible();
   await expect(page.getByText("No. SH1-00001")).toBeVisible();
   await expect(page.getByText("Rupees Ten Thousand Five Hundred Only")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print invoice" })).toBeVisible();
 
   // 7. The piece is now sold and can't be billed again
   await page.goto("/admin/inventory");
   await scan(page, code);
   await expect(page.getByText("sold", { exact: true })).toBeVisible();
+
+  await page.goto("/admin/inventory/receive");
+  await page.getByLabel("Product type").selectOption("existing");
+  await page.getByLabel("Existing product SKU").fill(code.replace(/-\d+$/, ""));
+  await page.getByRole("button", { name: "Receive & generate codes" }).click();
+  await expect(page.getByRole("list", { name: "Received codes" })).toHaveText(code.replace(/-001$/, "-003"));
+});
+
+test("a receipt over 300 pieces gives a print link for every barcode", async ({ page }) => {
+  await signInOwner(page);
+  await page.goto("/admin/inventory/receive");
+  const vendor = page.getByLabel("Vendor", { exact: true });
+  const demoVendor = await vendor.locator("option", { hasText: "Demo catalog" }).getAttribute("value");
+  await vendor.selectOption(demoVendor!);
+  await page.getByLabel("Product name").fill("QA large receipt");
+  await page.getByLabel("Category").fill("Silk saree");
+  await page.getByLabel("HSN code").fill("5007");
+  await page.getByLabel("Pieces received").fill("301");
+  await page.getByLabel("MRP per piece (₹)").fill("1000");
+  await page.getByRole("button", { name: "Receive & generate codes" }).click();
+
+  const first = page.getByRole("link", { name: "Print barcode labels 1–300" });
+  const last = page.getByRole("link", { name: "Print barcode labels 301–301" });
+  const codesFrom = (href: string) => new URL(href, "http://localhost").searchParams.get("codes")!.split(",");
+  const firstHref = (await first.getAttribute("href"))!;
+  const lastHref = (await last.getAttribute("href"))!;
+  expect(new Set([...codesFrom(firstHref), ...codesFrom(lastHref)]).size).toBe(301);
+  await page.goto(firstHref);
+  await expect(page.getByText(/300 label\(s\).*Code 39/)).toBeVisible();
+  await page.goto(lastHref);
+  await expect(page.getByText(/1 label\(s\).*Code 39/)).toBeVisible();
 });

@@ -79,7 +79,7 @@ export function UsersManager({ initial, roles, locations, selfId, perms }: Props
                 </td>
                 <td className="px-3 py-3 text-xs text-ink-soft">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("en-IN") : "Never"}</td>
                 <td className="px-5 py-3 text-right whitespace-nowrap">
-                  {perms.edit && (
+                  {perms.edit && (u.id === selfId || roles.some((role) => role.id === u.roleId && role.assignable)) && (
                     <>
                       <button className="text-xs font-semibold text-ink-2 hover:underline" onClick={() => setEditing(u)}>Edit</button>
                       {u.id !== selfId && (

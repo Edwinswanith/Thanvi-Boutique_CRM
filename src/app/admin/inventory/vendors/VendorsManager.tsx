@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { Modal } from "@/components/admin/Modal";
 import { Notice } from "@/components/admin/ui";
 import { api } from "@/lib/http";
 import type { VendorView } from "@/server/services/vendors";
 
-export function VendorsManager({ initial, canCreate }: { initial: VendorView[]; canCreate: boolean }) {
+export function VendorsManager({ initial, canCreate, showBills }: { initial: VendorView[]; canCreate: boolean; showBills: boolean }) {
   const [vendors, setVendors] = useState(initial);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export function VendorsManager({ initial, canCreate }: { initial: VendorView[]; 
             <tr className="border-b border-line-strong text-left text-[11px] uppercase tracking-wider text-ink-soft">
               <th className="px-5 py-3 font-semibold">ID</th><th className="px-3 py-3 font-semibold">Vendor</th>
               <th className="px-3 py-3 font-semibold">Contact</th><th className="px-5 py-3 font-semibold">GSTIN</th>
+              {showBills && <th className="px-3 py-3 font-semibold">Bills</th>}
             </tr>
           </thead>
           <tbody>
@@ -42,9 +44,10 @@ export function VendorsManager({ initial, canCreate }: { initial: VendorView[]; 
                 <td className="px-3 py-3 font-semibold">{v.name}</td>
                 <td className="px-3 py-3 text-ink-soft">{[v.contactName, v.phone].filter(Boolean).join(" · ") || "—"}</td>
                 <td className="code px-5 py-3">{v.gstin || "—"}</td>
+                {showBills && <td className="px-3 py-3"><Link className="underline" href={`/admin/payables?status=all&vendor=${v.id}`}>View bills</Link></td>}
               </tr>
             ))}
-            {!vendors.length && <tr><td colSpan={4} className="px-5 py-10 text-center text-ink-soft">No vendors yet.</td></tr>}
+            {!vendors.length && <tr><td colSpan={showBills ? 5 : 4} className="px-5 py-10 text-center text-ink-soft">No vendors yet.</td></tr>}
           </tbody>
         </table>
       </div>

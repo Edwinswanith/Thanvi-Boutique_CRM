@@ -2,12 +2,14 @@ import { Types } from "mongoose";
 import { connectDb } from "@/lib/db";
 import { collectionLabel, isCollectionKey, type CollectionKey } from "@/lib/storefront/collections";
 import { effectiveSeo } from "@/lib/storefront/listing";
+import { Item } from "@/models/Item";
+import { Location } from "@/models/Location";
 import { Product } from "@/models/Product";
 import { WebListing } from "@/models/WebListing";
 
 /**
  * Public, read-only storefront queries. Only `published` listings are ever
- * returned, and no internal data (cost, vendor, SKU, stock) leaves this file.
+ * returned, and no internal data (cost, vendor, SKU, or piece identifiers) leaves this file.
  */
 
 export interface StoreProduct {
@@ -16,6 +18,7 @@ export interface StoreProduct {
   collection: CollectionKey | "";
   colour: string;
   price: number;
+  availableQuantity: number;
   photos: string[];
   shortDescription: string;
   featured: boolean;
@@ -50,7 +53,17 @@ interface ListingLean {
 export const mediaUrl = (photoId: string) => `/api/media/${photoId}`;
 
 async function withPrices(listings: ListingLean[]): Promise<StoreProductDetail[]> {
-  const products = await Product.find({ _id: { $in: listings.map((l) => l.productId) } }).select("mrp").lean<{ _id: Types.ObjectId; mrp: number }[]>();
+  if (!listings.length) return [];
+  const ids = listings.map((listing) => listing.productId);
+  const [products, web] = await Promise.all([
+    Product.find({ _id: { $in: ids } }).select("mrp").lean<{ _id: Types.ObjectId; mrp: number }[]>(),
+    Location.findOne({ code: "WEB", type: "online", active: true }).select("_id").lean(),
+  ]);
+  const stock = web ? await Item.aggregate<{ _id: Types.ObjectId; quantity: number }>([
+    { $match: { locationId: web._id, status: "available", productId: { $in: ids } } },
+    { $group: { _id: "$productId", quantity: { $sum: 1 } } },
+  ]) : [];
+  const availability = new Map(stock.map((row) => [String(row._id), row.quantity]));
   const price = new Map(products.map((p) => [String(p._id), p.mrp]));
   return listings
     .filter((l) => price.has(String(l.productId)))
@@ -60,6 +73,7 @@ async function withPrices(listings: ListingLean[]): Promise<StoreProductDetail[]
       collection: isCollectionKey(l.collectionKey) ? l.collectionKey : "",
       colour: l.colour ?? "",
       price: price.get(String(l.productId))!,
+      availableQuantity: availability.get(String(l.productId)) ?? 0,
       photos: (l.photoIds ?? []).map(mediaUrl),
       shortDescription: l.shortDescription ?? "",
       featured: Boolean(l.featured),
@@ -73,8 +87,8 @@ async function withPrices(listings: ListingLean[]): Promise<StoreProductDetail[]
     }));
 }
 
-const summary = ({ slug, title, collection, colour, price, photos, shortDescription, featured }: StoreProductDetail): StoreProduct =>
-  ({ slug, title, collection, colour, price, photos, shortDescription, featured });
+const summary = ({ slug, title, collection, colour, price, availableQuantity, photos, shortDescription, featured }: StoreProductDetail): StoreProduct =>
+  ({ slug, title, collection, colour, price, availableQuantity, photos, shortDescription, featured });
 
 export async function listPublished(opts: { collection?: string; sort?: string; limit?: number } = {}): Promise<StoreProduct[]> {
   await connectDb();
@@ -122,13 +136,13 @@ export async function isPublishedPhoto(photoId: string): Promise<boolean> {
 }
 
 /** Fresh bag data for the given slugs (public, published only, max 50). */
-export async function publishedBySlugs(slugs: readonly string[]): Promise<{ slug: string; title: string; price: number; image: string; colour: string; collection: string }[]> {
+export async function publishedBySlugs(slugs: readonly string[]): Promise<{ slug: string; title: string; price: number; availableQuantity: number; image: string; colour: string; collection: string }[]> {
   await connectDb();
   const clean = [...new Set(slugs)].filter((s) => /^[a-z0-9-]{1,80}$/.test(s)).slice(0, 50);
   if (clean.length === 0) return [];
   const listings = await WebListing.find({ slug: { $in: clean }, status: "published" }).lean<ListingLean[]>();
   return (await withPrices(listings)).map((p) => ({
-    slug: p.slug, title: p.title, price: p.price, image: p.photos[0] ?? "", colour: p.colour, collection: p.collection ? collectionLabel(p.collection) : "",
+    slug: p.slug, title: p.title, price: p.price, availableQuantity: p.availableQuantity, image: p.photos[0] ?? "", colour: p.colour, collection: p.collection ? collectionLabel(p.collection) : "",
   }));
 }
 

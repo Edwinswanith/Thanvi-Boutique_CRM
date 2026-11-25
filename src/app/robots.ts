@@ -13,7 +13,7 @@ const AI_AND_SEARCH_AGENTS = [
 ];
 
 const ALLOW = ["/shop", "/api/media/", "/brand/", "/llms.txt"];
-const DISALLOW = ["/admin", "/login", "/api/", "/shop/bag"];
+const DISALLOW = ["/admin", "/login", "/api/", "/shop/bag", "/shop/checkout", "/shop/invoice/"];
 
 export default function robots(): MetadataRoute.Robots {
   return {

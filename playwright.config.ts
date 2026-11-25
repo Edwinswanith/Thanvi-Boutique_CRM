@@ -18,12 +18,12 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROME_EXECUTABLE } } }],
   webServer: {
-    command: `npx next build && npx next start -p ${PORT}`,
+    command: `node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start -p ${PORT}`,
     url: `http://localhost:${PORT}/login`,
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
     timeout: 300_000,
-    env: { MONGODB_DB: E2E_DB },
+    env: { MONGODB_DB: E2E_DB, ENABLE_TEST_CHECKOUT: "true" },
   },
 });

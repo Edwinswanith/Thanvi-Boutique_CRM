@@ -5,6 +5,7 @@ import { Location, type LocationType } from "@/models/Location";
 import { NumberSeries } from "@/models/NumberSeries";
 import type { Actor } from "@/server/actor";
 import { writeAudit } from "./audit";
+import { acceptsVendorStock } from "./myLocations";
 
 export interface LocationView {
   id: string;
@@ -16,6 +17,7 @@ export interface LocationView {
   phone: string;
   gstin: string;
   invoicePrefix: string;
+  acceptsVendorStock: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -33,6 +35,7 @@ function toView(doc: LocationLean): LocationView {
     phone: doc.phone ?? "",
     gstin: doc.gstin ?? "",
     invoicePrefix: doc.invoicePrefix ?? "",
+    acceptsVendorStock: acceptsVendorStock(doc),
     active: doc.active,
     createdAt: doc.createdAt ? doc.createdAt.toISOString() : "",
   };

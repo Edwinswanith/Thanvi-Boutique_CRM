@@ -1,5 +1,6 @@
 /** Characters encodable by Code 39 ("Code 3 of 9"). `*` is the start/stop char and is excluded. */
 const CODE39_PATTERN = /^[A-Z0-9 \-.$/+%]*$/;
+export const LABELS_PER_SHEET = 300;
 
 export function isCode39Safe(value: string): boolean {
   return CODE39_PATTERN.test(value);

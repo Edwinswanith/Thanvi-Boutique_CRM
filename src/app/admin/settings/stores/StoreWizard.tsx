@@ -14,9 +14,10 @@ interface Draft {
   phone: string;
   gstin: string;
   invoicePrefix: string;
+  acceptsVendorStock: boolean;
 }
 
-const EMPTY: Draft = { type: "store", name: "", code: "", address: "", city: "", phone: "", gstin: "", invoicePrefix: "" };
+const EMPTY: Draft = { type: "store", name: "", code: "", address: "", city: "", phone: "", gstin: "", invoicePrefix: "", acceptsVendorStock: false };
 const STEPS = ["Identity", "Address & GST", "Review"] as const;
 const TYPES: Array<{ value: Draft["type"]; label: string; hint: string }> = [
   { value: "store", label: "Store", hint: "Walk-in shop with billing" },
@@ -90,6 +91,12 @@ export function StoreWizard({ onClose, onCreated }: Props) {
               onChange={(e) => set("code", e.target.value.toUpperCase())} />
             <p className="mt-1 text-xs text-ink-soft">Used on barcodes and invoices. Letters, numbers and hyphens. Cannot be changed later.</p>
           </div>
+          {draft.type === "godown" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={draft.acceptsVendorStock} onChange={(event) => set("acceptsVendorStock", event.target.checked)} />
+              Receive vendor stock at this godown
+            </label>
+          )}
         </div>
       )}
 

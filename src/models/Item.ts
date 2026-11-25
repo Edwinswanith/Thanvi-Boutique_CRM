@@ -9,6 +9,7 @@ export const ITEM_STATUSES = [
   "stitching",
   "damaged",
   "returned",
+  "missing",
 ] as const;
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 
@@ -19,12 +20,15 @@ const itemSchema = new Schema(
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
     sku: { type: String, required: true, uppercase: true },
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true },
+    purchaseCost: { type: Number, min: 0, select: false },
     locationId: { type: Schema.Types.ObjectId, ref: "Location", required: true },
     binId: { type: Schema.Types.ObjectId, ref: "Bin", default: null },
     status: { type: String, enum: ITEM_STATUSES, default: "available" },
+    missingFrom: { type: String, enum: ITEM_STATUSES, default: null },
     receiptRef: { type: String, default: "" },
     transferId: { type: Schema.Types.ObjectId, ref: "Transfer", default: null },
     invoiceId: { type: Schema.Types.ObjectId, ref: "Invoice", default: null },
+    orderId: { type: String, ref: "Order", default: null },
   },
   { timestamps: true },
 );

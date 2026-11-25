@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { api } from "@/lib/http";
+import { isOwnerAdmin } from "@/lib/rbac/permissions";
 import type { RoleView } from "@/server/services/roles";
 import { PermissionMatrix } from "./PermissionMatrix";
 
 interface Props {
   initial: RoleView[];
   currentRoleId: string;
+  canGrantConfidential: boolean;
   perms: { create: boolean; edit: boolean; remove: boolean };
 }
 
@@ -27,7 +29,7 @@ const toDraft = (r?: RoleView): Draft => ({
   allLocations: r?.allLocations ?? false,
 });
 
-export function RolesManager({ initial, currentRoleId, perms }: Props) {
+export function RolesManager({ initial, currentRoleId, canGrantConfidential, perms }: Props) {
   const [roles, setRoles] = useState(initial);
   const [selectedId, setSelectedId] = useState<string | "new">(initial.find((r) => !r.isSystem)?.id ?? initial[0]?.id);
   const selected = roles.find((r) => r.id === selectedId);
@@ -36,7 +38,8 @@ export function RolesManager({ initial, currentRoleId, perms }: Props) {
   const [busy, setBusy] = useState(false);
 
   const isNew = selectedId === "new";
-  const locked = !isNew && (!!selected?.isSystem || selected?.id === currentRoleId || !perms.edit);
+  const owner = !!selected && isOwnerAdmin(selected);
+  const locked = !isNew && (owner || !!selected?.isSystem || (!!selected?.confidential && !canGrantConfidential) || selected?.id === currentRoleId || !perms.edit);
   const dirty = useMemo(() => {
     const base = toDraft(selected);
     return isNew || JSON.stringify({ ...draft, permissions: [...draft.permissions].sort() }) !== JSON.stringify({ ...base, permissions: [...base.permissions].sort() });
@@ -116,8 +119,8 @@ export function RolesManager({ initial, currentRoleId, perms }: Props) {
 
         {locked && selected && (
           <p className="mt-4 rounded-md border border-gold/40 bg-gold-wash px-3 py-2 text-sm">
-            {selected.isSystem
-              ? "The Super Admin role is locked: it can only manage setup and can never be given access to business data."
+            {selected.isSystem || owner
+              ? "This administrator role has fixed permissions."
               : selected.id === currentRoleId
                 ? "This is your own role. Another administrator must change it."
                 : "You can view this role but not edit it."}
@@ -128,13 +131,13 @@ export function RolesManager({ initial, currentRoleId, perms }: Props) {
           <div className="mt-5 flex flex-wrap gap-6">
             <Toggle label="All locations" hint="Ignore store/godown assignment" checked={draft.allLocations} disabled={locked}
               onChange={(v) => setDraft({ ...draft, allLocations: v })} />
-            <Toggle label="Confidential data" hint="Cost price, margins, financial reports" checked={draft.confidential} disabled={locked}
+            <Toggle label="Confidential data" hint="Cost price, margins, financial reports" checked={draft.confidential} disabled={locked || !canGrantConfidential}
               onChange={(v) => setDraft({ ...draft, confidential: v })} />
           </div>
         )}
 
         <div className="mt-6">
-          <PermissionMatrix isSystem={!!selected?.isSystem && !isNew} value={draft.permissions} disabled={locked}
+          <PermissionMatrix isSystem={!!selected?.isSystem && !isNew} includeSetup={owner} value={draft.permissions} disabled={locked}
             onChange={(p) => setDraft({ ...draft, permissions: p })} />
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { addLine, cartCount, cartSubtotal, parseCart, refreshLines, removeLine, setQty, type CartItem, type CartLine } from "@/lib/storefront/cart";
 
 const STORAGE_KEY = "tb_bag_v2";
@@ -14,7 +14,7 @@ interface CartState {
   bumpKey: number;
   drawerOpen: boolean;
   lastAdded: string | null;
-  add: (item: CartItem, opts?: { openDrawer?: boolean }) => void;
+  add: (item: CartItem, opts?: { openDrawer?: boolean; onlyIfMissing?: boolean }) => void;
   update: (slug: string, qty: number) => void;
   remove: (slug: string) => void;
   closeDrawer: () => void;
@@ -43,32 +43,40 @@ function writeStored(lines: CartLine[]): void {
 /** Bag kept in the browser. Phase 3 adds a server cart with stock reservation. */
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const currentLines = useRef<CartLine[]>([]);
+  const refreshVersion = useRef(0);
   const [ready, setReady] = useState(false);
   const [bumpKey, setBumpKey] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
 
   useEffect(() => {
-    setLines(readStored());
+    currentLines.current = readStored();
+    setLines(currentLines.current);
     setReady(true);
   }, []);
 
   const commit = useCallback((next: (prev: CartLine[]) => CartLine[]) => {
-    setLines((prev) => {
-      const updated = next(prev);
-      writeStored(updated);
-      return updated;
-    });
+    const updated = next(currentLines.current);
+    currentLines.current = updated;
+    writeStored(updated);
+    setLines(updated);
   }, []);
 
   const refresh = useCallback(async (): Promise<string[]> => {
-    const current = readStored();
-    if (current.length === 0) return [];
-    const res = await fetch(`/api/shop/products?slugs=${encodeURIComponent(current.map((l) => l.slug).join(","))}`).catch(() => null);
+    const version = ++refreshVersion.current;
+    const requested = new Set(currentLines.current.slice(0, 50).map((line) => line.slug));
+    if (!requested.size) return [];
+    const res = await fetch(`/api/shop/products?slugs=${encodeURIComponent([...requested].join(","))}`).catch(() => null);
     const json = (await res?.json().catch(() => null)) as { success?: boolean; data?: CartItem[] } | null;
-    if (!json?.success || !json.data) return [];
-    const { lines: fresh, removed } = refreshLines(current, json.data);
-    commit(() => fresh);
+    if (version !== refreshVersion.current || !json?.success || !json.data) return [];
+    const { lines: fresh, removed } = refreshLines(currentLines.current.filter((line) => requested.has(line.slug)), json.data);
+    const bySlug = new Map(fresh.map((line) => [line.slug, line]));
+    commit((prev) => prev.flatMap((line) => {
+      if (!requested.has(line.slug)) return [line];
+      const updated = bySlug.get(line.slug);
+      return updated ? [updated] : [];
+    }));
     return removed;
   }, [commit]);
 
@@ -81,7 +89,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     drawerOpen,
     lastAdded,
     add: (item, opts) => {
-      commit((prev) => addLine(prev, item));
+      commit((prev) => opts?.onlyIfMissing && prev.some((line) => line.slug === item.slug) ? prev : addLine(prev, item));
       setBumpKey((k) => k + 1);
       setLastAdded(item.slug);
       if (opts?.openDrawer !== false) setDrawerOpen(true);

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Forbidden } from "@/components/admin/PageHeader";
 import { Barcode } from "@/components/Barcode";
+import { LABELS_PER_SHEET } from "@/lib/code39";
 import { formatINR } from "@/lib/money";
 import { pageActor } from "@/server/page";
 import { lookupItem, type ItemView } from "@/server/services/items";
@@ -12,7 +13,7 @@ export const metadata: Metadata = { title: "Barcode labels" };
 export default async function LabelsPage({ searchParams }: { searchParams: Promise<{ codes?: string }> }) {
   const { actor, allowed } = await pageActor("inventory.view");
   if (!allowed) return <Forbidden />;
-  const codes = [...new Set(((await searchParams).codes ?? "").split(",").map((c) => c.trim().toUpperCase()).filter(Boolean))].slice(0, 300);
+  const codes = [...new Set(((await searchParams).codes ?? "").split(",").map((c) => c.trim().toUpperCase()).filter(Boolean))].slice(0, LABELS_PER_SHEET);
   const items = (await Promise.all(codes.map((c) => lookupItem(actor, c).catch(() => null)))).filter((i): i is ItemView => i !== null);
 
   return (

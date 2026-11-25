@@ -13,6 +13,7 @@ const locationSchema = new Schema(
     phone: { type: String, default: "", trim: true },
     gstin: { type: String, default: "", uppercase: true, trim: true },
     invoicePrefix: { type: String, default: "", uppercase: true, trim: true },
+    acceptsVendorStock: { type: Boolean },
     active: { type: Boolean, default: true },
   },
   { timestamps: true },

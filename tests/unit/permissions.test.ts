@@ -54,6 +54,21 @@ describe("hasPermission", () => {
     const owner = role({ permissions: ["system.roles.edit", "sales.view"] });
     expect(hasPermission(owner, "system.roles.edit")).toBe(false);
   });
+
+  it("allows configuration for the built-in Owner / Admin only", () => {
+    const owner = DEFAULT_ROLES.find((entry) => entry.slug === "owner")!;
+    expect(hasPermission(owner, "system.roles.edit")).toBe(true);
+    expect(hasPermission({ ...owner, builtIn: false }, "system.roles.edit")).toBe(false);
+    expect(hasPermission({ ...owner, confidential: false }, "payables.view")).toBe(false);
+  });
+
+  it("blocks the supplier directory for the Vendor role even with an old permission", () => {
+    const permissions = ["vendors.view", "vendors.create"];
+    expect(hasPermission(role({ slug: "vendor", permissions }), "vendors.view")).toBe(false);
+    expect(hasPermission(role({ slug: "vendor", permissions }), "vendors.create")).toBe(false);
+    expect(hasPermission(role({ slug: "godown-staff", permissions }), "vendors.view")).toBe(true);
+    expect(hasPermission(role({ slug: "owner", permissions }), "vendors.view")).toBe(true);
+  });
 });
 
 describe("sanitizePermissions", () => {
@@ -78,7 +93,8 @@ describe("default roles", () => {
 
   it("only uses valid permissions", () => {
     for (const r of DEFAULT_ROLES) {
-      expect(sanitizePermissions(r.permissions, r.isSystem)).toHaveLength(new Set(r.permissions).size);
+      expect(r.permissions.every((permission) => isValidPermission(permission) && hasPermission(r, permission))).toBe(true);
+      expect(r.permissions).toHaveLength(new Set(r.permissions).size);
     }
   });
 });

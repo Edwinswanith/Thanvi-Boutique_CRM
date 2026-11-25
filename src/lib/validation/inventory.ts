@@ -41,21 +41,27 @@ export const binGridSchema = z.object({
   zone: z.string().trim().max(40).default(""),
 });
 
-export const receiveSchema = z.object({
+const receiptFields = z.object({
   vendorId: objectId,
   locationId: objectId,
   binId: objectId.nullable().default(null),
+  costPrice: rupees.nullable().default(null),
+  quantity: z.number().int().min(1).max(500),
+  description: z.string().trim().max(500).default(""),
+});
+
+export const receiveSchema = z.union([receiptFields.extend({
+  existingSku: z.string().trim().toUpperCase().min(1).max(40).refine(isCode39Safe, "Invalid SKU"),
+}), receiptFields.extend({
+  existingSku: z.undefined().optional(),
   name: z.string().trim().min(2).max(120),
   category: z.string().trim().min(2).max(60),
   hsn: z.string().trim().regex(/^\d{4,8}$/, "HSN must be 4–8 digits"),
   mrp: rupees.refine((v) => v > 0, "MRP is required"),
-  costPrice: rupees.nullable().default(null),
-  quantity: z.number().int().min(1).max(500),
   color: z.string().trim().max(40).default(""),
   fabric: z.string().trim().max(60).default(""),
-  description: z.string().trim().max(500).default(""),
   photoIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).max(6).default([]),
-});
+})]);
 
 export const moveBinSchema = z.object({ binId: objectId.nullable() });
 

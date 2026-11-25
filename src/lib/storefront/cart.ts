@@ -13,6 +13,7 @@ export interface CartItem {
   title: string;
   /** Paise */
   price: number;
+  availableQuantity?: number;
   image: string;
   colour: string;
   collection: string;
@@ -22,18 +23,25 @@ export interface CartLine extends CartItem {
   qty: number;
 }
 
-const clamp = (qty: number) => Math.max(0, Math.min(MAX_QTY, Math.floor(qty)));
+export function quantityLimit(item: CartItem): number {
+  return Math.min(MAX_QTY, item.availableQuantity ?? MAX_QTY);
+}
+
+const clamp = (qty: number, item: CartItem) => Math.max(0, Math.min(quantityLimit(item), Math.floor(qty)));
 
 export function addLine(lines: readonly CartLine[], item: CartItem, qty = 1): CartLine[] {
   const existing = lines.find((l) => l.slug === item.slug);
-  if (!existing) return [...lines, { ...item, qty: clamp(qty) }];
-  return lines.map((l) => (l.slug === item.slug ? { ...l, ...item, qty: clamp(l.qty + qty) } : l));
+  if (quantityLimit(item) === 0) return removeLine(lines, item.slug);
+  if (!existing) return [...lines, { ...item, qty: clamp(qty, item) }];
+  return lines.map((l) => (l.slug === item.slug ? { ...l, ...item, qty: clamp(l.qty + qty, item) } : l));
 }
 
 export function setQty(lines: readonly CartLine[], slug: string, qty: number): CartLine[] {
-  const next = clamp(qty);
-  if (next === 0) return removeLine(lines, slug);
-  return lines.map((l) => (l.slug === slug ? { ...l, qty: next } : l));
+  return lines.flatMap((line) => {
+    if (line.slug !== slug) return [line];
+    const next = clamp(qty, line);
+    return next > 0 ? [{ ...line, qty: next }] : [];
+  });
 }
 
 export function removeLine(lines: readonly CartLine[], slug: string): CartLine[] {
@@ -55,9 +63,9 @@ export function refreshLines(lines: readonly CartLine[], live: readonly CartItem
   return {
     lines: lines.flatMap((l) => {
       const fresh = bySlug.get(l.slug);
-      return fresh ? [{ ...l, ...fresh, qty: l.qty }] : [];
+      return fresh && quantityLimit(fresh) > 0 ? [{ ...l, ...fresh, qty: clamp(l.qty, fresh) }] : [];
     }),
-    removed: lines.filter((l) => !bySlug.has(l.slug)).map((l) => l.title),
+    removed: lines.filter((l) => !bySlug.has(l.slug) || bySlug.get(l.slug)?.availableQuantity === 0).map((l) => l.title),
   };
 }
 
@@ -65,6 +73,7 @@ const storedLine = z.object({
   slug: z.string().min(1).max(120),
   title: z.string().max(200),
   price: z.number().int().nonnegative(),
+  availableQuantity: z.number().int().nonnegative().optional(),
   image: z.string().max(300),
   colour: z.string().max(100),
   collection: z.string().max(100),
@@ -79,7 +88,9 @@ export function parseCart(raw: string | null): CartLine[] {
     if (!Array.isArray(data)) return [];
     return data.flatMap((entry) => {
       const parsed = storedLine.safeParse(entry);
-      return parsed.success ? [{ ...parsed.data, qty: clamp(parsed.data.qty) }] : [];
+      if (!parsed.success) return [];
+      const qty = clamp(parsed.data.qty, parsed.data);
+      return qty > 0 ? [{ ...parsed.data, qty }] : [];
     });
   } catch {
     return [];

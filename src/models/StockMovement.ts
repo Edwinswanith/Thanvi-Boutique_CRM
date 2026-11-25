@@ -9,6 +9,7 @@ export const MOVEMENT_TYPES = [
   "release",
   "sale",
   "status_change",
+  "adjustment",
 ] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
 

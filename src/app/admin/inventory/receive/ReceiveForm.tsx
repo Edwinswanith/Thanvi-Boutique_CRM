@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Notice } from "@/components/admin/ui";
+import { LABELS_PER_SHEET } from "@/lib/code39";
 import { api } from "@/lib/http";
 import type { ReceiptResult } from "@/server/services/receiving";
 import type { LocationOption } from "@/server/services/myLocations";
@@ -12,18 +13,20 @@ interface VendorOption { id: string; code: string; name: string }
 interface Props {
   vendors: VendorOption[];
   locations: LocationOption[];
+  initialLocationId: string;
   canAddVendor: boolean;
   showCost: boolean;
 }
 
 const CATEGORIES = ["Silk saree", "Cotton saree", "Fancy saree", "Designer saree", "Blouse", "Readymade", "Dress material", "Accessories"];
 
-export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, showCost }: Props) {
+export function ReceiveForm({ vendors: initialVendors, locations, initialLocationId, canAddVendor, showCost }: Props) {
   const [vendors, setVendors] = useState(initialVendors);
   const [vendorId, setVendorId] = useState(initialVendors[0]?.id ?? "");
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
+  const [locationId, setLocationId] = useState(initialLocationId);
   const [bins, setBins] = useState<{ id: string; code: string }[]>([]);
   const [photoIds, setPhotoIds] = useState<string[]>([]);
+  const [existing, setExisting] = useState(false);
   const [result, setResult] = useState<ReceiptResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,7 +52,8 @@ export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, 
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     const num = (k: string) => (f.get(k) === "" || f.get(k) === null ? null : Number(f.get(k)));
     setBusy(true);
     setError(null);
@@ -57,15 +61,17 @@ export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, 
       const res = await api<ReceiptResult>("/api/inventory/receive", {
         method: "POST",
         body: {
-          vendorId, locationId, binId: f.get("binId") || null, photoIds,
-          name: f.get("name"), category: f.get("category"), hsn: f.get("hsn"),
-          mrp: num("mrp"), costPrice: showCost ? num("costPrice") : null, quantity: num("quantity"),
-          color: f.get("color"), fabric: f.get("fabric"), description: f.get("description"),
+          vendorId, locationId, binId: f.get("binId") || null,
+          costPrice: showCost ? num("costPrice") : null, quantity: num("quantity"), description: f.get("description"),
+          ...(existing ? { existingSku: f.get("existingSku") } : {
+            photoIds, name: f.get("name"), category: f.get("category"), hsn: f.get("hsn"),
+            mrp: num("mrp"), color: f.get("color"), fabric: f.get("fabric"),
+          }),
         },
       });
       setResult(res);
       setPhotoIds([]);
-      e.currentTarget?.reset();
+      form.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not receive stock");
     } finally {
@@ -78,6 +84,13 @@ export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
       <form method="post" action="/admin/inventory/receive" onSubmit={submit} className="panel rise rise-1 space-y-5 p-6">
+        <div>
+          <label className="label" htmlFor="receipt-product-type">Product type</label>
+          <select id="receipt-product-type" className="field" value={existing ? "existing" : "new"} onChange={(e) => setExisting(e.target.value === "existing")} disabled={busy}>
+            <option value="new">New product</option>
+            <option value="existing">Restock existing SKU</option>
+          </select>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="r-vendor">Vendor</label>
@@ -97,9 +110,10 @@ export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, 
           </div>
         </div>
 
-        <PhotoPicker photoIds={photoIds} onChange={setPhotoIds} />
+        {!existing && <PhotoPicker photoIds={photoIds} onChange={setPhotoIds} />}
 
         <div className="grid gap-4 sm:grid-cols-2">
+          {existing ? <Field id="existingSku" label="Existing product SKU" placeholder="TB1000" required maxLength={40} mono /> : <>
           <Field id="name" label="Product name" placeholder="Kanchipuram silk, temple border" required />
           <div>
             <label className="label" htmlFor="r-category">Category</label>
@@ -107,11 +121,12 @@ export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, 
             <datalist id="categories">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
           </div>
           <Field id="hsn" label="HSN code" placeholder="5007" required pattern="\d{4,8}" mono />
-          <Field id="quantity" label="Pieces received" type="number" min={1} max={500} defaultValue="1" required mono />
           <Field id="mrp" label="MRP per piece (₹)" type="number" min={1} step="0.01" required mono />
-          {showCost && <Field id="costPrice" label="Purchase price (₹) — confidential" type="number" min={0} step="0.01" mono />}
           <Field id="color" label="Colour" />
           <Field id="fabric" label="Fabric" />
+          </>}
+          <Field id="quantity" label="Pieces received" type="number" min={1} max={500} defaultValue="1" required mono />
+          {showCost && <Field id="costPrice" label="Purchase price (₹) — confidential" type="number" min={0} step="0.01" mono />}
         </div>
         <div>
           <label className="label" htmlFor="r-bin">Put away into bin</label>
@@ -138,12 +153,20 @@ export function ReceiveForm({ vendors: initialVendors, locations, canAddVendor, 
               <p className="display text-2xl">SKU {result.sku}</p>
               <p className="text-sm text-ink-soft">{result.codes.length} piece(s) received</p>
               <ul aria-label="Received codes" className="code mt-3 max-h-56 space-y-0.5 overflow-y-auto text-sm">{result.codes.map((c) => <li key={c}>{c}</li>)}</ul>
-              <Link className="btn btn-primary mt-4 w-full" href={`/admin/inventory/labels?codes=${result.codes.join(",")}`} target="_blank">Print barcode labels</Link>
+              {Array.from({ length: Math.ceil(result.codes.length / LABELS_PER_SHEET) }, (_, index) => {
+                const start = index * LABELS_PER_SHEET;
+                const codes = result.codes.slice(start, start + LABELS_PER_SHEET);
+                return (
+                  <Link key={start} className="btn btn-primary mt-4 w-full" href={`/admin/inventory/labels?codes=${encodeURIComponent(codes.join(","))}`} target="_blank">
+                    {result.codes.length <= LABELS_PER_SHEET ? "Print barcode labels" : `Print barcode labels ${start + 1}–${start + codes.length}`}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-line-strong p-5 text-sm text-ink-soft">
-            After receiving, the new SKU and each piece&apos;s code (e.g. <span className="code">TB1000-001</span>) appear here, ready to print as Code 39 labels.
+            After receiving, the SKU and each new piece&apos;s code (e.g. <span className="code">TB1000-001</span>) appear here, ready to print as Code 39 labels.
           </div>
         )}
       </aside>

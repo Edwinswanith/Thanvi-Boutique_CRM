@@ -6,13 +6,15 @@ import type { Actor } from "@/server/actor";
 
 export interface TransitionInput {
   code: string;
-  expect: { status: ItemStatus | ItemStatus[]; locationId?: Types.ObjectId | string };
+  expect: { status: ItemStatus | ItemStatus[]; locationId?: Types.ObjectId | string; orderId?: string; updatedAt?: Date };
   set: Partial<{
     status: ItemStatus;
+    missingFrom: ItemStatus | null;
     locationId: Types.ObjectId | string;
     binId: Types.ObjectId | string | null;
     transferId: Types.ObjectId | string | null;
     invoiceId: Types.ObjectId | string | null;
+    orderId: string | null;
   }>;
   movement: { type: MovementType; reference?: string; note?: string };
 }
@@ -22,10 +24,12 @@ export interface TransitionInput {
  * people can never sell or dispatch the same piece) plus a ledger row, both in
  * the caller's transaction.
  */
-export async function transitionItem(actor: Actor, input: TransitionInput, session: ClientSession) {
+export async function transitionItem(actor: Pick<Actor, "name"> & { id: string | null }, input: TransitionInput, session: ClientSession) {
   const statuses = Array.isArray(input.expect.status) ? input.expect.status : [input.expect.status];
   const filter: Record<string, unknown> = { code: input.code, status: { $in: statuses } };
   if (input.expect.locationId) filter.locationId = input.expect.locationId;
+  if (input.expect.orderId) filter.orderId = input.expect.orderId;
+  if (input.expect.updatedAt) filter.updatedAt = input.expect.updatedAt;
 
   const before = await Item.findOneAndUpdate(filter, { $set: input.set }, { session, returnDocument: "before" }).lean();
   if (!before) {

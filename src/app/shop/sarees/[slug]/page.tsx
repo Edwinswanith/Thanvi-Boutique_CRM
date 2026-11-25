@@ -88,7 +88,7 @@ export default async function ProductPage({ params }: { params: Params }) {
           {p.colour && <p className="mt-2 text-sm text-ink-soft">Colour: <span className="text-ink">{p.colour}</span></p>}
           <p className="mt-6 text-3xl font-semibold">{formatPrice(p.price)}</p>
           <div className="zari-rule my-7 w-full" />
-          <AddToBag item={{ slug: p.slug, title: p.title, price: p.price, image: p.photos[0] ?? "", colour: p.colour, collection: p.collection ? fabric : "" }} />
+          <AddToBag item={{ slug: p.slug, title: p.title, price: p.price, availableQuantity: p.availableQuantity, image: p.photos[0] ?? "", colour: p.colour, collection: p.collection ? fabric : "" }} />
           {paragraphs.length > 0 && (
             <div className="mt-8 space-y-4 leading-relaxed text-ink/85">{paragraphs.map((t) => <p key={t.slice(0, 40)}>{t}</p>)}</div>
           )}
